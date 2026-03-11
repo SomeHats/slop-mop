@@ -8,15 +8,15 @@ import {
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionNotification,
+  type ToolCallContent,
 } from "@agentclientprotocol/sdk"
 import { useCallback, useRef, useState } from "react"
 import { createAgentStream } from "../lib/agent-stream"
 import { killAgent, spawnAgent } from "../lib/tauri"
-import type { PreviousSession, SessionMessage, SessionToolCall } from "../lib/types"
+import type { PreviousSession, TimelineEntry } from "../lib/types"
 
 type AgentSessionState = {
-  messages: SessionMessage[]
-  toolCalls: SessionToolCall[]
+  timeline: TimelineEntry[]
   isProcessing: boolean
   isConnected: boolean
   hasActiveSession: boolean
@@ -46,8 +46,7 @@ function extractText(content: ContentBlock): string {
 }
 
 const INITIAL_STATE: AgentSessionState = {
-  messages: [],
-  toolCalls: [],
+  timeline: [],
   isProcessing: false,
   isConnected: false,
   hasActiveSession: false,
@@ -74,49 +73,100 @@ export function useAgentSession(): AgentSession {
         if (!text) break
 
         setState((prev) => {
-          const lastMessage = prev.messages[prev.messages.length - 1]
-          if (lastMessage?.role === "agent") {
+          const lastEntry = prev.timeline[prev.timeline.length - 1]
+          if (lastEntry?.kind === "agent_message") {
             return {
               ...prev,
-              messages: [
-                ...prev.messages.slice(0, -1),
-                { ...lastMessage, content: lastMessage.content + text },
+              timeline: [
+                ...prev.timeline.slice(0, -1),
+                { ...lastEntry, content: lastEntry.content + text },
               ],
             }
           }
           return {
             ...prev,
-            messages: [...prev.messages, { id: generateMessageId(), role: "agent", content: text }],
+            timeline: [
+              ...prev.timeline,
+              { kind: "agent_message" as const, id: generateMessageId(), content: text },
+            ],
+          }
+        })
+        break
+      }
+      case "agent_thought_chunk": {
+        const text = extractText(update.content)
+        if (!text) break
+
+        setState((prev) => {
+          const lastEntry = prev.timeline[prev.timeline.length - 1]
+          if (lastEntry?.kind === "agent_thought") {
+            return {
+              ...prev,
+              timeline: [
+                ...prev.timeline.slice(0, -1),
+                { ...lastEntry, content: lastEntry.content + text },
+              ],
+            }
+          }
+          return {
+            ...prev,
+            timeline: [
+              ...prev.timeline,
+              { kind: "agent_thought" as const, id: generateMessageId(), content: text },
+            ],
           }
         })
         break
       }
       case "tool_call": {
+        const toolEntry: TimelineEntry = {
+          kind: "tool_call",
+          id: update.toolCallId,
+          title: update.title,
+          status: update.status ?? "in_progress",
+          content: (update.content ?? []) as ToolCallContent[],
+          ...(update.kind != null ? { toolKind: update.kind } : {}),
+          ...(update.rawInput !== undefined ? { rawInput: update.rawInput } : {}),
+          ...(update.rawOutput !== undefined ? { rawOutput: update.rawOutput } : {}),
+        }
         setState((prev) => ({
           ...prev,
-          toolCalls: [
-            ...prev.toolCalls,
-            {
-              id: update.toolCallId,
-              title: update.title,
-              status: update.status ?? "in_progress",
-            },
-          ],
+          timeline: [...prev.timeline, toolEntry],
         }))
         break
       }
       case "tool_call_update": {
         setState((prev) => ({
           ...prev,
-          toolCalls: prev.toolCalls.map((tc) =>
-            tc.id === update.toolCallId
-              ? {
-                  ...tc,
-                  title: update.title ?? tc.title,
-                  status: update.status ?? tc.status,
-                }
-              : tc,
-          ),
+          timeline: prev.timeline.map((entry) => {
+            if (entry.kind !== "tool_call" || entry.id !== update.toolCallId) {
+              return entry
+            }
+            const updated: TimelineEntry = {
+              ...entry,
+              title: update.title ?? entry.title,
+              status: update.status ?? entry.status,
+              ...(update.content !== undefined
+                ? { content: (update.content ?? []) as ToolCallContent[] }
+                : {}),
+              ...(update.kind != null
+                ? { toolKind: update.kind }
+                : entry.toolKind != null
+                  ? { toolKind: entry.toolKind }
+                  : {}),
+              ...(update.rawInput !== undefined
+                ? { rawInput: update.rawInput }
+                : entry.rawInput !== undefined
+                  ? { rawInput: entry.rawInput }
+                  : {}),
+              ...(update.rawOutput !== undefined
+                ? { rawOutput: update.rawOutput }
+                : entry.rawOutput !== undefined
+                  ? { rawOutput: entry.rawOutput }
+                  : {}),
+            }
+            return updated
+          }),
         }))
         break
       }
@@ -248,8 +298,7 @@ export function useAgentSession(): AgentSession {
 
     setState((prev) => ({
       ...prev,
-      messages: [],
-      toolCalls: [],
+      timeline: [],
       isProcessing: true,
       error: null,
     }))
@@ -282,15 +331,14 @@ export function useAgentSession(): AgentSession {
     const sessionId = sessionIdRef.current
     if (!connection || !sessionId) return
 
-    const userMessage: SessionMessage = {
+    const userEntry: TimelineEntry = {
+      kind: "user_message",
       id: generateMessageId(),
-      role: "user",
       content: text,
     }
     setState((prev) => ({
       ...prev,
-      messages: [...prev.messages, userMessage],
-      toolCalls: [],
+      timeline: [...prev.timeline, userEntry],
       isProcessing: true,
       error: null,
     }))

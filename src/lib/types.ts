@@ -1,3 +1,5 @@
+import type { ToolCallContent, ToolCallStatus, ToolKind } from "@agentclientprotocol/sdk"
+
 export type Project = {
   id: string
   name: string
@@ -5,20 +7,23 @@ export type Project = {
   opened_at: string
 }
 
-export type SessionMessage = {
-  id: string
-  role: "user" | "agent"
-  content: string
-}
-
-export type SessionToolCall = {
-  id: string
-  title: string
-  status: string
-}
-
 export type PreviousSession = {
   sessionId: string
   title: string | null
   updatedAt: string | null
 }
+
+export type TimelineEntry =
+  | { kind: "user_message"; id: string; content: string }
+  | { kind: "agent_message"; id: string; content: string }
+  | { kind: "agent_thought"; id: string; content: string }
+  | {
+      kind: "tool_call"
+      id: string
+      title: string
+      status: ToolCallStatus
+      toolKind?: ToolKind
+      content: ToolCallContent[]
+      rawInput?: unknown
+      rawOutput?: unknown
+    }

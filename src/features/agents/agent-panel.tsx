@@ -1,13 +1,12 @@
 import { type FormEvent, useEffect, useRef, useState } from "react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { cn } from "@/lib/utils"
 import { useAgentSession } from "../../hooks/use-agent-session"
-import type { PreviousSession, SessionMessage, SessionToolCall } from "../../lib/types"
+import type { PreviousSession } from "../../lib/types"
+import { TimelineEntryRow } from "./timeline-entry"
 
 type AgentPanelProps = {
   projectPath: string
@@ -15,8 +14,7 @@ type AgentPanelProps = {
 
 export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element {
   const {
-    messages,
-    toolCalls,
+    timeline,
     isProcessing,
     isConnected,
     hasActiveSession,
@@ -31,15 +29,17 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
 
   const [input, setInput] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const showHeader = isConnected || isProcessing
 
-  const lastMessageId = messages[messages.length - 1]?.id
-  const lastToolCallId = toolCalls[toolCalls.length - 1]?.id
   useEffect(() => {
-    if (lastMessageId || lastToolCallId) {
+    void connect(projectPath)
+  }, [connect, projectPath])
+
+  const lastEntryId = timeline[timeline.length - 1]?.id
+  useEffect(() => {
+    if (lastEntryId) {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }
-  }, [lastMessageId, lastToolCallId])
+  }, [lastEntryId])
 
   const handleSubmit = (e: FormEvent): void => {
     e.preventDefault()
@@ -53,11 +53,9 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 py-2">
         <h2 className="text-sm font-medium text-foreground">Agent</h2>
-        {showHeader ? (
-          <Button variant="ghost" size="xs" onClick={() => void stopSession()}>
-            Stop
-          </Button>
-        ) : null}
+        <Button variant="ghost" size="xs" onClick={() => void stopSession()}>
+          Stop
+        </Button>
       </div>
       <Separator />
 
@@ -70,11 +68,7 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
         </>
       ) : null}
 
-      {!showHeader ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Button onClick={() => void connect(projectPath)}>Start Session</Button>
-        </div>
-      ) : isConnected && !hasActiveSession ? (
+      {isConnected && !hasActiveSession ? (
         <SessionPicker
           sessions={previousSessions}
           isProcessing={isProcessing}
@@ -85,13 +79,10 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
         <>
           <ScrollArea className="flex-1">
             <div className="flex flex-col gap-3 p-4">
-              {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} />
+              {timeline.map((entry) => (
+                <TimelineEntryRow key={entry.id} entry={entry} />
               ))}
-              {toolCalls.map((tc) => (
-                <ToolCallRow key={tc.id} toolCall={tc} />
-              ))}
-              {isProcessing && messages.length === 0 && toolCalls.length === 0 ? (
+              {isProcessing && timeline.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Connecting...</p>
               ) : null}
               <div ref={messagesEndRef} />
@@ -166,33 +157,6 @@ function SessionPicker({
   )
 }
 
-function MessageBubble({ message }: { message: SessionMessage }): React.JSX.Element {
-  return (
-    <div
-      className={cn(
-        "text-sm",
-        message.role === "user"
-          ? "bg-muted px-3 py-2 text-foreground"
-          : "text-foreground/80 whitespace-pre-wrap",
-      )}
-    >
-      {message.role === "user" ? (
-        <span className="mb-1 block text-xs font-medium text-muted-foreground">You</span>
-      ) : null}
-      {message.content}
-    </div>
-  )
-}
-
-function ToolCallRow({ toolCall }: { toolCall: SessionToolCall }): React.JSX.Element {
-  return (
-    <div className="flex items-center gap-2 border border-border px-3 py-1.5 text-xs text-muted-foreground">
-      <span className="truncate">{toolCall.title}</span>
-      <StatusBadge status={toolCall.status} />
-    </div>
-  )
-}
-
 function formatRelativeTime(iso: string): string {
   const date = new Date(iso)
   const now = Date.now()
@@ -207,16 +171,4 @@ function formatRelativeTime(iso: string): string {
 
   const diffDays = Math.floor(diffHours / 24)
   return `${diffDays.toString()}d ago`
-}
-
-const statusVariants: Record<string, "secondary" | "default" | "destructive" | "outline"> = {
-  pending: "secondary",
-  in_progress: "default",
-  completed: "outline",
-  failed: "destructive",
-}
-
-function StatusBadge({ status }: { status: string }): React.JSX.Element {
-  const variant = statusVariants[status] ?? "secondary"
-  return <Badge variant={variant}>{status}</Badge>
 }
