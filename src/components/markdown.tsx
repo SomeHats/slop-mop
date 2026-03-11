@@ -25,7 +25,7 @@ const components: Components = {
     )
   },
   p: ({ children, ...props }) => (
-    <p className="text-sm leading-relaxed" {...props}>
+    <p className="text-xs font-light leading-relaxed" {...props}>
       {children}
     </p>
   ),
@@ -35,37 +35,37 @@ const components: Components = {
     </a>
   ),
   ul: ({ children, ...props }) => (
-    <ul className="list-disc pl-4 text-sm" {...props}>
+    <ul className="list-disc pl-4 text-xs font-light" {...props}>
       {children}
     </ul>
   ),
   ol: ({ children, ...props }) => (
-    <ol className="list-decimal pl-4 text-sm" {...props}>
+    <ol className="list-decimal pl-4 text-xs font-light" {...props}>
       {children}
     </ol>
   ),
   li: ({ children, ...props }) => (
-    <li className="text-sm" {...props}>
+    <li className="text-xs font-light" {...props}>
       {children}
     </li>
   ),
   h1: ({ children, ...props }) => (
-    <h1 className="text-2xl font-medium" {...props}>
+    <h1 className="text-lg font-semibold" {...props}>
       {children}
     </h1>
   ),
   h2: ({ children, ...props }) => (
-    <h2 className="text-xl font-medium" {...props}>
+    <h2 className="text-base font-semibold" {...props}>
       {children}
     </h2>
   ),
   h3: ({ children, ...props }) => (
-    <h3 className="text-lg font-medium" {...props}>
+    <h3 className="text-sm font-medium" {...props}>
       {children}
     </h3>
   ),
   h4: ({ children, ...props }) => (
-    <h4 className="text-base font-medium" {...props}>
+    <h4 className="text-xs font-medium" {...props}>
       {children}
     </h4>
   ),
@@ -73,6 +73,11 @@ const components: Components = {
     <blockquote className="border-l-2 border-border pl-3 text-muted-foreground italic" {...props}>
       {children}
     </blockquote>
+  ),
+  strong: ({ children, ...props }) => (
+    <strong className="font-bold" {...props}>
+      {children}
+    </strong>
   ),
   hr: () => <Separator />,
 }

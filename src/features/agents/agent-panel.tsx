@@ -77,7 +77,7 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
         />
       ) : (
         <>
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 overflow-hidden">
             <div className="flex flex-col gap-3 p-4">
               {timeline.map((entry) => (
                 <TimelineEntryRow key={entry.id} entry={entry} />
