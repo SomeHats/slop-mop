@@ -18,25 +18,25 @@ pnpm install
 
 ## Development
 
-Run the Tauri desktop app (starts Vite dev server + native window):
+Run the full Tauri desktop app (starts Vite dev server + native window):
 
 ```sh
-pnpm tauri:dev
+pnpm dev
 ```
 
 Run the frontend only in a browser (no Rust backend):
 
 ```sh
-pnpm dev
+pnpm dev:vite
 ```
 
 ## Scripts
 
 | Script            | What it does                              |
 | ----------------- | ----------------------------------------- |
-| `pnpm dev`        | Start Vite dev server (frontend only)     |
+| `pnpm dev`        | Launch Tauri app in development mode      |
+| `pnpm dev:vite`   | Start Vite dev server (frontend only)     |
 | `pnpm build`      | TypeScript check + Vite production build  |
-| `pnpm tauri:dev`  | Launch Tauri app in development mode      |
 | `pnpm tauri:build` | Build distributable Tauri app            |
 | `pnpm typecheck`  | Run TypeScript compiler (no emit)         |
 | `pnpm check`      | Run Biome linter + formatter              |

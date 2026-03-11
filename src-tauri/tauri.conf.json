@@ -5,7 +5,7 @@
   "identifier": "com.claude-creche.app",
   "build": {
     "beforeBuildCommand": "pnpm build",
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "pnpm dev:vite",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
