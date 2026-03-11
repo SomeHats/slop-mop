@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { useAgentSession } from "../../hooks/use-agent-session"
-import type { PreviousSession } from "../../lib/types"
+import type { PreviousSession, SessionMessage, SessionToolCall } from "../../lib/types"
 
 type AgentPanelProps = {
   projectPath: string
@@ -49,20 +49,12 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
     void sendPrompt(text)
   }
 
-  const handleConnect = (): void => {
-    void connect(projectPath)
-  }
-
-  const handleStop = (): void => {
-    void stopSession()
-  }
-
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-4 py-2">
         <h2 className="text-sm font-medium text-foreground">Agent</h2>
         {showHeader ? (
-          <Button variant="ghost" size="xs" onClick={handleStop}>
+          <Button variant="ghost" size="xs" onClick={() => void stopSession()}>
             Stop
           </Button>
         ) : null}
@@ -80,7 +72,7 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
 
       {!showHeader ? (
         <div className="flex flex-1 items-center justify-center">
-          <Button onClick={handleConnect}>Start Session</Button>
+          <Button onClick={() => void connect(projectPath)}>Start Session</Button>
         </div>
       ) : isConnected && !hasActiveSession ? (
         <SessionPicker
@@ -94,31 +86,10 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
           <ScrollArea className="flex-1">
             <div className="flex flex-col gap-3 p-4">
               {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "text-sm",
-                    msg.role === "user"
-                      ? "bg-muted px-3 py-2 text-foreground"
-                      : "text-foreground/80 whitespace-pre-wrap",
-                  )}
-                >
-                  {msg.role === "user" ? (
-                    <span className="mb-1 block text-xs font-medium text-muted-foreground">
-                      You
-                    </span>
-                  ) : null}
-                  {msg.content}
-                </div>
+                <MessageBubble key={msg.id} message={msg} />
               ))}
               {toolCalls.map((tc) => (
-                <div
-                  key={tc.id}
-                  className="flex items-center gap-2 border border-border px-3 py-1.5 text-xs text-muted-foreground"
-                >
-                  <span className="truncate">{tc.title}</span>
-                  <StatusBadge status={tc.status} />
-                </div>
+                <ToolCallRow key={tc.id} toolCall={tc} />
               ))}
               {isProcessing && messages.length === 0 && toolCalls.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Connecting...</p>
@@ -191,6 +162,33 @@ function SessionPicker({
           ))}
         </ItemGroup>
       </ScrollArea>
+    </div>
+  )
+}
+
+function MessageBubble({ message }: { message: SessionMessage }): React.JSX.Element {
+  return (
+    <div
+      className={cn(
+        "text-sm",
+        message.role === "user"
+          ? "bg-muted px-3 py-2 text-foreground"
+          : "text-foreground/80 whitespace-pre-wrap",
+      )}
+    >
+      {message.role === "user" ? (
+        <span className="mb-1 block text-xs font-medium text-muted-foreground">You</span>
+      ) : null}
+      {message.content}
+    </div>
+  )
+}
+
+function ToolCallRow({ toolCall }: { toolCall: SessionToolCall }): React.JSX.Element {
+  return (
+    <div className="flex items-center gap-2 border border-border px-3 py-1.5 text-xs text-muted-foreground">
+      <span className="truncate">{toolCall.title}</span>
+      <StatusBadge status={toolCall.status} />
     </div>
   )
 }
