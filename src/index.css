@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/jetbrains-mono";
-@import "highlight.js/styles/github-dark.css";
+@import "./styles/highlight-theme.css";
 
 @custom-variant dark (&:is(.dark *));
 

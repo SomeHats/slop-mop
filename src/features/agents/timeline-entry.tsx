@@ -33,7 +33,7 @@ function UserMessageEntry({ content }: { content: string }): React.JSX.Element {
 
 function AgentMessageEntry({ content }: { content: string }): React.JSX.Element {
   return (
-    <div className="text-foreground/80">
+    <div className="text-foreground/90">
       <Markdown content={content} />
     </div>
   )
@@ -45,12 +45,12 @@ function ThoughtEntry({ content }: { content: string }): React.JSX.Element {
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="flex w-full items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
+      <CollapsibleTrigger className="flex w-full items-center gap-2 text-xs text-foreground/50 hover:text-foreground">
         <ChevronRight className={cn("size-3 shrink-0 transition-transform", open && "rotate-90")} />
         <span className="truncate italic">{open ? "Thinking" : preview}</span>
       </CollapsibleTrigger>
       <CollapsibleContent className="pl-5 pt-1">
-        <div className="text-xs text-muted-foreground italic">
+        <div className="text-xs text-foreground/50 italic">
           <Markdown content={content} />
         </div>
       </CollapsibleContent>
@@ -78,7 +78,7 @@ function ToolCallEntry({
       <CollapsibleTrigger
         disabled={!hasContent}
         className={cn(
-          "flex w-full items-center gap-2 border border-border px-3 py-1.5 text-xs text-muted-foreground",
+          "flex w-full items-center gap-2 border border-border px-3 py-1.5 text-xs text-foreground/60",
           hasContent && "hover:text-foreground",
         )}
       >
@@ -103,7 +103,7 @@ function ToolCallEntry({
 
 function ToolCallContentView({ content }: { content: ToolCallContent[] }): React.JSX.Element {
   return (
-    <div className="flex flex-col gap-2 text-xs text-muted-foreground">
+    <div className="flex flex-col gap-2 text-xs text-foreground/70">
       {content.map((item, index) => (
         <ToolCallContentItem key={`${item.type}-${index.toString()}`} item={item} />
       ))}
@@ -213,7 +213,7 @@ function DiffView({
 
           return (
             <div key={`hunk-${hunkIndex.toString()}`}>
-              <div className="select-none px-2 py-0.5 text-muted-foreground/50">
+              <div className="select-none px-2 py-0.5 text-foreground/30">
                 @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
               </div>
               {hunk.lines.map((line, lineIndex) => {
@@ -248,7 +248,7 @@ function DiffView({
                           ? "text-green-400"
                           : prefix === "-"
                             ? "text-red-400"
-                            : "text-muted-foreground/30",
+                            : "text-foreground/20",
                       )}
                     >
                       {prefix}

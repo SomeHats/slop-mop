@@ -1,0 +1,149 @@
+/*
+ * Syntax highlighting theme for Claude Creche.
+ * Built from Tailwind's color palettes: purple, violet, fuchsia, pink,
+ * rose, sky, and stone — cool sunset spectrum on a dark stone base.
+ */
+
+.hljs {
+  @apply bg-transparent text-stone-200;
+}
+
+/* Keywords & control flow */
+.hljs-keyword,
+.hljs-literal,
+.hljs-section {
+  @apply font-semibold text-purple-400;
+}
+
+/* Strings & templates */
+.hljs-string,
+.hljs-template-variable {
+  @apply text-sky-300;
+}
+
+/* Comments */
+.hljs-comment,
+.hljs-doctag,
+.hljs-quote {
+  @apply italic text-stone-400;
+}
+
+/* Numbers */
+.hljs-number {
+  @apply text-rose-300;
+}
+
+/* Functions */
+.hljs-title.function_,
+.hljs-title.invoke__ {
+  @apply text-fuchsia-400;
+}
+
+/* Types & classes */
+.hljs-title.class_,
+.hljs-type {
+  @apply text-pink-400;
+}
+
+/* Built-in */
+.hljs-built_in {
+  @apply text-amber-400;
+}
+
+/* Attributes & object keys */
+.hljs-attr,
+.hljs-property {
+  @apply text-rose-400;
+}
+
+/* Variables */
+.hljs-variable,
+.hljs-variable.language_ {
+  @apply text-stone-200;
+}
+
+/* Parameters */
+.hljs-params {
+  @apply text-stone-300;
+}
+
+/* Regexp */
+.hljs-regexp {
+  @apply text-fuchsia-300;
+}
+
+/* Symbols */
+.hljs-symbol {
+  @apply text-sky-300;
+}
+
+/* Meta & preprocessor */
+.hljs-meta,
+.hljs-meta .hljs-keyword {
+  @apply text-violet-400;
+}
+
+/* Operators */
+.hljs-operator {
+  @apply text-stone-300;
+}
+
+/* Punctuation */
+.hljs-punctuation {
+  @apply text-stone-300;
+}
+
+/* HTML/XML tags */
+.hljs-tag {
+  @apply text-stone-300;
+}
+
+.hljs-name {
+  @apply text-pink-400;
+}
+
+/* CSS selectors */
+.hljs-selector-class {
+  @apply text-fuchsia-400;
+}
+
+.hljs-selector-tag {
+  @apply text-pink-400;
+}
+
+.hljs-selector-id {
+  @apply text-sky-300;
+}
+
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  @apply text-rose-400;
+}
+
+/* Subst */
+.hljs-subst {
+  @apply text-stone-100;
+}
+
+/* Diff markers */
+.hljs-addition {
+  @apply bg-green-500/10 text-green-300;
+}
+
+.hljs-deletion {
+  @apply bg-red-500/10 text-red-300;
+}
+
+/* Emphasis */
+.hljs-emphasis {
+  @apply italic;
+}
+
+.hljs-strong {
+  @apply font-bold;
+}
+
+/* Links */
+.hljs-link {
+  @apply text-purple-400 underline;
+}
