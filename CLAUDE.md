@@ -42,6 +42,7 @@ A native desktop app (Tauri v2) that provides:
 | Language (FE)  | TypeScript (strictest config) | `strict`, `noUncheckedIndexedAccess`, etc.   |
 | Language (BE)  | Rust                          | Tauri commands for filesystem, git, process  |
 | Framework      | React                         | Functional components, hooks only           |
+| UI Components  | shadcn/ui (radix-lyra preset) | Composable primitives, added as source code |
 | Styling        | Tailwind CSS v4               | Utility-first, no custom CSS unless needed  |
 | Build          | Vite                          | SWC-based React plugin for speed            |
 | Lint + Format  | Biome                         | Rust-based, replaces ESLint + Prettier      |
@@ -58,6 +59,22 @@ The app is split into two layers:
 - **Backend (Rust)** — Tauri commands that handle git operations, worktree
   management, process spawning (Claude Code instances), and file system access.
   This is where all privileged operations live.
+
+## Design
+
+Minimal and technical. The UI should feel like a developer tool, not a consumer
+app.
+
+- **Dark mode only** — hardcoded via `class="dark"` on `<html>`.
+- **No border radius** — all corners sharp (`rounded-none` in the lyra preset).
+- **Monospace font** — JetBrains Mono everywhere.
+- **Purple accent** — primary color is purple (oklch purple from the stone/lyra
+  theme).
+- **Semantic color tokens** — use `bg-background`, `text-foreground`,
+  `text-muted-foreground`, `bg-muted`, `border-border`, etc. Never raw color
+  values like `bg-zinc-800`.
+- **shadcn components first** — use existing shadcn/ui components (`Button`,
+  `Item`, `Badge`, `ScrollArea`, etc.) before writing custom markup.
 
 ## Conventions
 

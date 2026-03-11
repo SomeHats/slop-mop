@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 import { AgentPanel } from "./features/agents/agent-panel"
 import { ProjectPicker } from "./features/projects/project-picker"
 import type { Project } from "./lib/types"
@@ -13,7 +14,7 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
-      <div className="flex items-center justify-between border-b border-border px-4 py-2">
+      <div className="flex items-center justify-between px-4 py-2">
         <div className="flex items-center gap-3">
           <h1 className="text-sm font-bold tracking-tight">{currentProject.name}</h1>
           <span className="text-xs text-muted-foreground">{currentProject.path}</span>
@@ -22,6 +23,7 @@ export function App(): React.JSX.Element {
           Close
         </Button>
       </div>
+      <Separator />
       <div className="flex-1 overflow-hidden">
         <AgentPanel projectPath={currentProject.path} />
       </div>

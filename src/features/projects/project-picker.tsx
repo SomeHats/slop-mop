@@ -75,7 +75,7 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps): React.JSX.
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
-      <div className="w-full max-w-md space-y-6 p-8">
+      <div className="flex w-full max-w-md flex-col gap-6 p-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold tracking-tight">Claude Crèche</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -90,7 +90,7 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps): React.JSX.
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
         {recentProjects.length > 0 ? (
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Recent
             </h2>
@@ -113,7 +113,7 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps): React.JSX.
                         className="opacity-0 group-hover/item:opacity-100"
                         title="Remove from recent"
                       >
-                        <X />
+                        <X data-icon="inline-start" />
                       </Button>
                     </ItemActions>
                   </button>

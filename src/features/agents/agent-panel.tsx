@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { cn } from "@/lib/utils"
 import { useAgentSession } from "../../hooks/use-agent-session"
 import type { PreviousSession } from "../../lib/types"
 
@@ -57,7 +59,7 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border px-4 py-2">
+      <div className="flex items-center justify-between px-4 py-2">
         <h2 className="text-sm font-medium text-foreground">Agent</h2>
         {showHeader ? (
           <Button variant="ghost" size="xs" onClick={handleStop}>
@@ -65,11 +67,15 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
           </Button>
         ) : null}
       </div>
+      <Separator />
 
       {error ? (
-        <div className="border-b border-border px-4 py-2">
-          <p className="text-xs text-destructive">{error}</p>
-        </div>
+        <>
+          <div className="px-4 py-2">
+            <p className="text-xs text-destructive">{error}</p>
+          </div>
+          <Separator />
+        </>
       ) : null}
 
       {!showHeader ? (
@@ -86,15 +92,16 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
       ) : (
         <>
           <ScrollArea className="flex-1">
-            <div className="space-y-3 p-4">
+            <div className="flex flex-col gap-3 p-4">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
-                  className={
+                  className={cn(
+                    "text-sm",
                     msg.role === "user"
-                      ? "rounded-lg bg-muted px-3 py-2 text-sm text-foreground"
-                      : "text-sm text-foreground/80 whitespace-pre-wrap"
-                  }
+                      ? "bg-muted px-3 py-2 text-foreground"
+                      : "text-foreground/80 whitespace-pre-wrap",
+                  )}
                 >
                   {msg.role === "user" ? (
                     <span className="mb-1 block text-xs font-medium text-muted-foreground">
@@ -107,7 +114,7 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
               {toolCalls.map((tc) => (
                 <div
                   key={tc.id}
-                  className="flex items-center gap-2 rounded border border-border px-3 py-1.5 text-xs text-muted-foreground"
+                  className="flex items-center gap-2 border border-border px-3 py-1.5 text-xs text-muted-foreground"
                 >
                   <span className="truncate">{tc.title}</span>
                   <StatusBadge status={tc.status} />
@@ -120,7 +127,8 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
             </div>
           </ScrollArea>
 
-          <form onSubmit={handleSubmit} className="flex gap-2 border-t border-border p-3">
+          <Separator />
+          <form onSubmit={handleSubmit} className="flex gap-2 p-3">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
