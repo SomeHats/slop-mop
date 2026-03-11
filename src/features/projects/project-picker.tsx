@@ -2,6 +2,14 @@ import { open } from "@tauri-apps/plugin-dialog"
 import { X } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemTitle,
+} from "@/components/ui/item"
 import { listRecentProjects, openProject, removeProject } from "../../lib/tauri"
 import type { Project } from "../../lib/types"
 
@@ -86,33 +94,32 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps): React.JSX.
             <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Recent
             </h2>
-            <ul className="space-y-1">
+            <ItemGroup>
               {recentProjects.map((project) => (
-                <li key={project.id} className="group flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void handleSelectRecent(project)}
-                    className="flex-1 rounded-none border border-transparent px-3 py-2 text-left transition-all outline-none select-none hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 active:translate-y-px dark:hover:bg-muted/50"
-                  >
-                    <span className="block truncate text-sm font-medium text-foreground">
-                      {project.name}
-                    </span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {project.path}
-                    </span>
+                <Item key={project.id} asChild size="sm" className="cursor-pointer">
+                  <button type="button" onClick={() => void handleSelectRecent(project)}>
+                    <ItemContent>
+                      <ItemTitle>{project.name}</ItemTitle>
+                      <ItemDescription>{project.path}</ItemDescription>
+                    </ItemContent>
+                    <ItemActions>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleRemove(project.id)
+                        }}
+                        className="opacity-0 group-hover/item:opacity-100"
+                        title="Remove from recent"
+                      >
+                        <X />
+                      </Button>
+                    </ItemActions>
                   </button>
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={() => void handleRemove(project.id)}
-                    className="opacity-0 group-hover:opacity-100"
-                    title="Remove from recent"
-                  >
-                    <X className="size-3.5" />
-                  </Button>
-                </li>
+                </Item>
               ))}
-            </ul>
+            </ItemGroup>
           </div>
         ) : null}
       </div>

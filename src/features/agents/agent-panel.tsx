@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAgentSession } from "../../hooks/use-agent-session"
 import type { PreviousSession } from "../../lib/types"
@@ -158,26 +159,29 @@ function SessionPicker({
         </Button>
       </div>
       <ScrollArea className="flex-1">
-        <div className="space-y-1">
+        <ItemGroup>
           {sessions.map((session) => (
-            <button
+            <Item
               key={session.sessionId}
-              type="button"
-              onClick={() => onResumeSession(session.sessionId)}
-              disabled={isProcessing}
-              className="w-full rounded-none border border-transparent px-3 py-2 text-left transition-all outline-none select-none hover:bg-muted hover:text-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/50 active:translate-y-px disabled:pointer-events-none disabled:opacity-50 dark:hover:bg-muted/50"
+              asChild
+              size="sm"
+              className="cursor-pointer disabled:pointer-events-none disabled:opacity-50"
             >
-              <span className="block truncate text-sm font-medium text-foreground">
-                {session.title ?? session.sessionId}
-              </span>
-              {session.updatedAt ? (
-                <span className="block truncate text-xs text-muted-foreground">
-                  {formatRelativeTime(session.updatedAt)}
-                </span>
-              ) : null}
-            </button>
+              <button
+                type="button"
+                onClick={() => onResumeSession(session.sessionId)}
+                disabled={isProcessing}
+              >
+                <ItemContent>
+                  <ItemTitle>{session.title ?? session.sessionId}</ItemTitle>
+                  {session.updatedAt ? (
+                    <ItemDescription>{formatRelativeTime(session.updatedAt)}</ItemDescription>
+                  ) : null}
+                </ItemContent>
+              </button>
+            </Item>
           ))}
-        </div>
+        </ItemGroup>
       </ScrollArea>
     </div>
   )
