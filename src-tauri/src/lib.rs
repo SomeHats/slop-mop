@@ -49,30 +49,26 @@ pub fn run() {
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                let app = window.app_handle();
-
                 // Kill agents owned by this window
                 if let Some(manager) = window.try_state::<agent::AgentManager>() {
                     manager.kill_all();
                 }
-
-                // If no windows remain (aside from the one being destroyed),
-                // reopen the picker
-                let remaining = app.webview_windows().len();
-                if remaining <= 1 {
-                    let app = app.clone();
-                    // Defer to next tick so the window finishes deregistering
-                    std::thread::spawn(move || {
-                        std::thread::sleep(std::time::Duration::from_millis(100));
-                        if app.webview_windows().is_empty() {
-                            if let Err(e) = window::open_picker_window(&app) {
-                                eprintln!("Failed to reopen picker: {e}");
-                            }
-                        }
-                    });
-                }
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                // Prevent auto-exit when last window closes — we manage that ourselves
+                // by reopening the picker in on_window_event
+                api.prevent_exit();
+
+                // If no windows remain, reopen the picker
+                if app.webview_windows().is_empty() {
+                    if let Err(e) = window::open_picker_window(app) {
+                        eprintln!("Failed to reopen picker: {e}");
+                    }
+                }
+            }
+        });
 }
