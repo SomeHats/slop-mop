@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useRef, useState } from "react"
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
@@ -6,6 +6,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { useAgentSession } from "../../hooks/use-agent-session"
 import type { PreviousSession } from "../../lib/types"
+import { ActivityGroup } from "./activity-group"
+import { groupTimeline } from "./group-timeline"
 import { TimelineEntryRow } from "./timeline-entry"
 
 type AgentPanelProps = {
@@ -67,6 +69,8 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
     }
   }, [timelineVersion])
 
+  const segments = useMemo(() => groupTimeline(timeline), [timeline])
+
   const handleSubmit = (e: FormEvent): void => {
     e.preventDefault()
     const text = input.trim()
@@ -108,9 +112,17 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
             className="flex-1 overflow-hidden [&>[data-slot=scroll-area-viewport]>div]:!block"
           >
             <div className="flex flex-col gap-3 p-4">
-              {timeline.map((entry) => (
-                <TimelineEntryRow key={entry.id} entry={entry} />
-              ))}
+              {segments.map((segment, i) =>
+                segment.kind === "passthrough" ? (
+                  <TimelineEntryRow key={segment.entry.id} entry={segment.entry} />
+                ) : (
+                  <ActivityGroup
+                    key={segment.id}
+                    entries={segment.entries}
+                    isLast={i === segments.length - 1}
+                  />
+                ),
+              )}
               {isProcessing && timeline.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Connecting...</p>
               ) : null}

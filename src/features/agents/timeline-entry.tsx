@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { Markdown } from "@/components/markdown"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { useScrollIntoView } from "@/hooks/use-scroll-into-view"
 import { highlightTokens, type ThemedToken, tokenStyle } from "@/lib/shiki"
 import type { TimelineEntry } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -41,10 +42,16 @@ function AgentMessageEntry({ content }: { content: string }): React.JSX.Element 
 
 function ThoughtEntry({ content }: { content: string }): React.JSX.Element {
   const [open, setOpen] = useState(false)
+  const { ref, scrollAfterExpand } = useScrollIntoView()
   const preview = content.length > 80 ? `${content.slice(0, 80)}...` : content
 
+  const handleOpenChange = (next: boolean): void => {
+    setOpen(next)
+    if (next) scrollAfterExpand()
+  }
+
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible ref={ref} open={open} onOpenChange={handleOpenChange}>
       <CollapsibleTrigger className="flex w-full items-center gap-2 text-xs text-foreground/50 hover:text-foreground">
         <ChevronRight className={cn("size-3 shrink-0 transition-transform", open && "rotate-90")} />
         <span className="truncate italic">{open ? "Thinking" : preview}</span>
@@ -71,10 +78,16 @@ function ToolCallEntry({
   entry: Extract<TimelineEntry, { kind: "tool_call" }>
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
+  const { ref, scrollAfterExpand } = useScrollIntoView()
   const hasContent = entry.content.length > 0
 
+  const handleOpenChange = (next: boolean): void => {
+    setOpen(next)
+    if (next) scrollAfterExpand()
+  }
+
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible ref={ref} open={open} onOpenChange={handleOpenChange}>
       <CollapsibleTrigger
         disabled={!hasContent}
         className={cn(
