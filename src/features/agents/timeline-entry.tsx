@@ -94,28 +94,60 @@ function ToolCallEntry({
       </CollapsibleTrigger>
       {hasContent ? (
         <CollapsibleContent className="border-x border-b border-border px-3 py-2">
-          <ToolCallContentView content={entry.content} />
+          <ToolCallContentView
+            content={entry.content}
+            toolKind={entry.toolKind}
+            title={entry.title}
+          />
         </CollapsibleContent>
       ) : null}
     </Collapsible>
   )
 }
 
-function ToolCallContentView({ content }: { content: ToolCallContent[] }): React.JSX.Element {
+function langFromPath(filePath: string): string | undefined {
+  const ext = filePath.split(".").pop()?.toLowerCase()
+  return ext ? EXT_TO_LANGUAGE[ext] : undefined
+}
+
+function ToolCallContentView({
+  content,
+  toolKind,
+  title,
+}: {
+  content: ToolCallContent[]
+  toolKind?: string | undefined
+  title: string
+}): React.JSX.Element {
+  const readLang = toolKind === "read" ? langFromPath(title) : undefined
+
   return (
     <div className="flex flex-col gap-2 text-xs text-foreground/70">
       {content.map((item, index) => (
-        <ToolCallContentItem key={`${item.type}-${index.toString()}`} item={item} />
+        <ToolCallContentItem
+          key={`${item.type}-${index.toString()}`}
+          item={item}
+          readLanguage={readLang}
+        />
       ))}
     </div>
   )
 }
 
-function ToolCallContentItem({ item }: { item: ToolCallContent }): React.JSX.Element {
+function ToolCallContentItem({
+  item,
+  readLanguage,
+}: {
+  item: ToolCallContent
+  readLanguage?: string | undefined
+}): React.JSX.Element {
   switch (item.type) {
     case "content": {
       const block = item.content
       if (block.type === "text") {
+        if (readLanguage) {
+          return <FileContentView code={block.text} language={readLanguage} />
+        }
         return <Markdown content={block.text} />
       }
       return <span>Non-text content</span>
@@ -147,6 +179,52 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   bash: "bash",
   sql: "sql",
   go: "go",
+}
+
+function FileContentView({
+  code,
+  language,
+}: {
+  code: string
+  language: string
+}): React.JSX.Element {
+  const [lines, setLines] = useState<ThemedToken[][] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    highlightTokens(code, language).then((result) => {
+      if (!cancelled) setLines(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [code, language])
+
+  const plainLines = code.split("\n")
+
+  return (
+    <pre className="overflow-x-auto bg-muted text-xs">
+      {plainLines.map((plainLine, i) => {
+        const lineTokens = lines?.[i]
+        return (
+          <div key={i.toString()} className="px-2">
+            <span className="inline-block w-8 select-none pr-3 text-right text-foreground/20">
+              {(i + 1).toString()}
+            </span>
+            {lineTokens ? (
+              lineTokens.map((token, j) => (
+                <span key={j.toString()} style={tokenStyle(token)}>
+                  {token.content}
+                </span>
+              ))
+            ) : (
+              <span>{plainLine}</span>
+            )}
+          </div>
+        )
+      })}
+    </pre>
+  )
 }
 
 function DiffView({
