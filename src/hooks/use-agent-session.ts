@@ -359,6 +359,17 @@ export function useAgentSession(): AgentSession {
       if (projectPath) {
         const dirty = await isWorktreeDirty(projectPath)
         if (dirty) {
+          // Show the auto-commit prompt in the timeline as a system message
+          const commitEntry: TimelineEntry = {
+            kind: "system_message",
+            id: generateMessageId(),
+            content: "Uncommitted changes detected — asking agent to commit before proceeding.",
+          }
+          setState((prev) => ({
+            ...prev,
+            timeline: [...prev.timeline, commitEntry],
+          }))
+
           // Ask the agent to commit, then verify
           await connection.prompt({
             sessionId,

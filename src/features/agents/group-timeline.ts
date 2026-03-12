@@ -85,7 +85,12 @@ export function groupTimeline(timeline: TimelineEntry[]): TimelineSegment[] {
   let currentGroup: ActivityGroupSegment | null = null
 
   for (const entry of timeline) {
-    if (isUngrouped(entry) || entry.kind === "user_message" || entry.kind === "agent_message") {
+    if (
+      isUngrouped(entry) ||
+      entry.kind === "user_message" ||
+      entry.kind === "system_message" ||
+      entry.kind === "agent_message"
+    ) {
       // Break any open group, then passthrough
       if (currentGroup) {
         flushGroup(segments, currentGroup)

@@ -31,6 +31,7 @@ export type PromptSnapshot = {
 
 export type TimelineEntry =
   | { kind: "user_message"; id: string; content: string }
+  | { kind: "system_message"; id: string; content: string }
   | { kind: "agent_message"; id: string; content: string }
   | { kind: "agent_thought"; id: string; content: string }
   | {

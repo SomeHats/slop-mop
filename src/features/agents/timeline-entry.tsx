@@ -14,6 +14,8 @@ export function TimelineEntryRow({ entry }: { entry: TimelineEntry }): React.JSX
   switch (entry.kind) {
     case "user_message":
       return <UserMessageEntry content={entry.content} />
+    case "system_message":
+      return <SystemMessageEntry content={entry.content} />
     case "agent_message":
       return <AgentMessageEntry content={entry.content} />
     case "agent_thought":
@@ -27,6 +29,15 @@ function UserMessageEntry({ content }: { content: string }): React.JSX.Element {
   return (
     <div className="bg-muted px-3 py-2 text-foreground">
       <span className="mb-1 block text-xs font-medium text-foreground/60">You</span>
+      <Markdown content={content} />
+    </div>
+  )
+}
+
+function SystemMessageEntry({ content }: { content: string }): React.JSX.Element {
+  return (
+    <div className="bg-muted px-3 py-2 text-foreground">
+      <span className="mb-1 block text-xs font-medium text-primary/60">Crèche</span>
       <Markdown content={content} />
     </div>
   )
