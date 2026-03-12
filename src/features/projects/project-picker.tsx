@@ -69,7 +69,7 @@ export function ProjectPicker(): React.JSX.Element {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <div className="drag h-12 shrink-0" />
+      <div data-tauri-drag-region className="h-12 shrink-0" />
       <div className="flex flex-1 items-center justify-center">
         <div className="flex w-full max-w-md flex-col gap-6 p-8">
           <div className="text-center">

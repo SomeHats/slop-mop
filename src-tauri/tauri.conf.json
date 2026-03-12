@@ -16,6 +16,7 @@
         "title": "Claude Crèche",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
+        "trafficLightPosition": { "x": 12, "y": 16 },
         "width": 600,
         "height": 500,
         "resizable": true,
