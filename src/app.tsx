@@ -18,10 +18,9 @@ export function App(): React.JSX.Element {
         data-tauri-drag-region
         className={`flex items-center px-4 py-2 ${fullscreen ? "" : "pl-[78px]"}`}
       >
-        <div className="flex items-center gap-3">
-          <h1 className="text-sm font-bold tracking-tight">{project.name}</h1>
-          <span className="text-xs text-muted-foreground">{project.path}</span>
-        </div>
+        <h1 className="text-sm font-bold tracking-tight" title={project.path}>
+          {project.name}
+        </h1>
       </div>
       <Separator />
       <div className="flex-1 overflow-hidden">

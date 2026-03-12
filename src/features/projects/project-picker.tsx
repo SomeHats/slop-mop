@@ -91,7 +91,7 @@ export function ProjectPicker(): React.JSX.Element {
                 Recent
               </h2>
               <ItemGroup>
-                {recentProjects.map((project) => (
+                {recentProjects.slice(0, 3).map((project) => (
                   <Item key={project.id} asChild size="sm" className="cursor-pointer">
                     <button type="button" onClick={() => void handleSelectRecent(project)}>
                       <ItemContent>

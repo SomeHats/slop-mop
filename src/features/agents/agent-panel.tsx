@@ -25,7 +25,6 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
     connect,
     newSession,
     resumeSession,
-    stopSession,
     sendPrompt,
   } = useAgentSession()
 
@@ -81,14 +80,6 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2">
-        <h2 className="text-sm font-medium text-foreground">Agent</h2>
-        <Button variant="ghost" size="xs" onClick={() => void stopSession()}>
-          Stop
-        </Button>
-      </div>
-      <Separator />
-
       {error ? (
         <>
           <div className="px-4 py-2">

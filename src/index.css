@@ -122,8 +122,11 @@
   }
   body {
     @apply bg-background text-foreground;
+    overscroll-behavior: none;
   }
   html {
     @apply font-mono;
+    overscroll-behavior: none;
+    overflow: hidden;
   }
 }
