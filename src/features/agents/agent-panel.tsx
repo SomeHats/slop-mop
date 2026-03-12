@@ -28,18 +28,44 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
   } = useAgentSession()
 
   const [input, setInput] = useState("")
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const isAtBottomRef = useRef(true)
+  const viewportRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     void connect(projectPath)
   }, [connect, projectPath])
 
-  const lastEntryId = timeline[timeline.length - 1]?.id
+  // Capture the viewport element and attach scroll listener.
+  // hasActiveSession is an intentional trigger — the ScrollArea mounts/unmounts with it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional trigger
   useEffect(() => {
-    if (lastEntryId) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+      "[data-slot=scroll-area-viewport]",
+    )
+    viewportRef.current = viewport ?? null
+    if (!viewport) return
+    const onScroll = (): void => {
+      const { scrollTop, scrollHeight, clientHeight } = viewport
+      isAtBottomRef.current = scrollHeight - scrollTop - clientHeight < 30
     }
-  }, [lastEntryId])
+    viewport.addEventListener("scroll", onScroll, { passive: true })
+    return () => viewport.removeEventListener("scroll", onScroll)
+  }, [hasActiveSession])
+
+  // Auto-scroll to bottom when content changes, if already at bottom.
+  // Uses useEffect (runs after paint) so the viewport is guaranteed to be laid out.
+  const timelineVersion = timeline.length > 0 ? timeline[timeline.length - 1] : null
+  useEffect(() => {
+    if (!isAtBottomRef.current || !timelineVersion) return
+    const viewport =
+      viewportRef.current ??
+      scrollAreaRef.current?.querySelector<HTMLElement>("[data-slot=scroll-area-viewport]") ??
+      null
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight
+    }
+  }, [timelineVersion])
 
   const handleSubmit = (e: FormEvent): void => {
     e.preventDefault()
@@ -77,7 +103,10 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
         />
       ) : (
         <>
-          <ScrollArea className="flex-1 overflow-hidden [&>[data-slot=scroll-area-viewport]>div]:!block">
+          <ScrollArea
+            ref={scrollAreaRef}
+            className="flex-1 overflow-hidden [&>[data-slot=scroll-area-viewport]>div]:!block"
+          >
             <div className="flex flex-col gap-3 p-4">
               {timeline.map((entry) => (
                 <TimelineEntryRow key={entry.id} entry={entry} />
@@ -85,7 +114,6 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
               {isProcessing && timeline.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Connecting...</p>
               ) : null}
-              <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
 
