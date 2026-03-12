@@ -4,17 +4,18 @@ import { Input } from "@/components/ui/input"
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { useAgentSession } from "../../hooks/use-agent-session"
-import type { PreviousSession } from "../../lib/types"
+import type { AgentSession } from "../../hooks/use-agent-session"
+import type { PreviousSession, Project } from "../../lib/types"
 import { ActivityGroup } from "./activity-group"
 import { groupTimeline } from "./group-timeline"
 import { TimelineEntryRow } from "./timeline-entry"
 
 type AgentPanelProps = {
-  projectPath: string
+  project: Project
+  session: AgentSession
 }
 
-export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element {
+export function AgentPanel({ project, session }: AgentPanelProps): React.JSX.Element {
   const {
     timeline,
     isProcessing,
@@ -26,7 +27,7 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
     newSession,
     resumeSession,
     sendPrompt,
-  } = useAgentSession()
+  } = session
 
   const [input, setInput] = useState("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
@@ -34,8 +35,8 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
   const viewportRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    void connect(projectPath)
-  }, [connect, projectPath])
+    void connect(project.path, project.id)
+  }, [connect, project.path, project.id])
 
   // Capture the viewport element and attach scroll listener.
   // hasActiveSession is an intentional trigger — the ScrollArea mounts/unmounts with it.

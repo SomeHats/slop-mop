@@ -12,11 +12,12 @@ import {
 } from "@agentclientprotocol/sdk"
 import { useCallback, useRef, useState } from "react"
 import { createAgentStream } from "../lib/agent-stream"
-import { killAgent, spawnAgent } from "../lib/tauri"
-import type { PreviousSession, TimelineEntry } from "../lib/types"
+import { killAgent, listPromptSnapshots, recordPromptSnapshot, spawnAgent } from "../lib/tauri"
+import type { PreviousSession, PromptSnapshot, TimelineEntry } from "../lib/types"
 
 type AgentSessionState = {
   timeline: TimelineEntry[]
+  snapshots: PromptSnapshot[]
   isProcessing: boolean
   isConnected: boolean
   hasActiveSession: boolean
@@ -24,8 +25,8 @@ type AgentSessionState = {
   error: string | null
 }
 
-type AgentSession = AgentSessionState & {
-  connect: (projectPath: string) => Promise<void>
+export type AgentSession = AgentSessionState & {
+  connect: (projectPath: string, projectId: string) => Promise<void>
   newSession: () => Promise<void>
   resumeSession: (sessionId: string) => Promise<void>
   stopSession: () => Promise<void>
@@ -47,6 +48,7 @@ function extractText(content: ContentBlock): string {
 
 const INITIAL_STATE: AgentSessionState = {
   timeline: [],
+  snapshots: [],
   isProcessing: false,
   isConnected: false,
   hasActiveSession: false,
@@ -62,6 +64,7 @@ export function useAgentSession(): AgentSession {
   const agentIdRef = useRef<string | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
   const projectPathRef = useRef<string | null>(null)
+  const projectIdRef = useRef<string | null>(null)
   const capabilitiesRef = useRef<AgentCapabilities | null>(null)
 
   const handleSessionUpdate = useCallback((params: SessionNotification): void => {
@@ -195,9 +198,10 @@ export function useAgentSession(): AgentSession {
   }, [])
 
   const connect = useCallback(
-    async (projectPath: string): Promise<void> => {
+    async (projectPath: string, projectId: string): Promise<void> => {
       setState({ ...INITIAL_STATE, isProcessing: true })
       projectPathRef.current = projectPath
+      projectIdRef.current = projectId
 
       try {
         const agentId = await spawnAgent(projectPath)
@@ -299,6 +303,7 @@ export function useAgentSession(): AgentSession {
     setState((prev) => ({
       ...prev,
       timeline: [],
+      snapshots: [],
       isProcessing: true,
       error: null,
     }))
@@ -311,8 +316,16 @@ export function useAgentSession(): AgentSession {
       })
       sessionIdRef.current = sessionId
 
+      let snapshots: PromptSnapshot[] = []
+      try {
+        snapshots = await listPromptSnapshots(sessionId)
+      } catch {
+        // Non-critical — proceed without snapshots
+      }
+
       setState((prev) => ({
         ...prev,
+        snapshots,
         isProcessing: false,
         hasActiveSession: true,
         previousSessions: [],
@@ -329,11 +342,15 @@ export function useAgentSession(): AgentSession {
   const sendPrompt = useCallback(async (text: string): Promise<void> => {
     const connection = connectionRef.current
     const sessionId = sessionIdRef.current
+    const projectId = projectIdRef.current
+    const projectPath = projectPathRef.current
     if (!connection || !sessionId) return
+
+    const messageId = crypto.randomUUID()
 
     const userEntry: TimelineEntry = {
       kind: "user_message",
-      id: generateMessageId(),
+      id: messageId,
       content: text,
     }
     setState((prev) => ({
@@ -343,9 +360,22 @@ export function useAgentSession(): AgentSession {
       error: null,
     }))
 
+    // Fire-and-forget snapshot recording
+    if (projectId && projectPath) {
+      recordPromptSnapshot(sessionId, projectId, messageId, text, projectPath).then(
+        (snapshot) => {
+          setState((prev) => ({ ...prev, snapshots: [...prev.snapshots, snapshot] }))
+        },
+        () => {
+          // Snapshot failure is non-critical
+        },
+      )
+    }
+
     try {
       await connection.prompt({
         sessionId,
+        messageId,
         prompt: [{ type: "text", text }],
       })
     } catch (e) {
@@ -366,6 +396,7 @@ export function useAgentSession(): AgentSession {
     sessionIdRef.current = null
     agentIdRef.current = null
     projectPathRef.current = null
+    projectIdRef.current = null
     capabilitiesRef.current = null
 
     if (agentId) {

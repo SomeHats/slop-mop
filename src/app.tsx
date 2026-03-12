@@ -1,12 +1,15 @@
 import { Separator } from "@/components/ui/separator"
 import { AgentPanel } from "./features/agents/agent-panel"
 import { ProjectPicker } from "./features/projects/project-picker"
+import { SnapshotSidebar } from "./features/snapshots/snapshot-sidebar"
+import { useAgentSession } from "./hooks/use-agent-session"
 import { useFullscreen } from "./hooks/use-fullscreen"
 
 const project = window.__PROJECT
 
 export function App(): React.JSX.Element {
   const fullscreen = useFullscreen()
+  const session = useAgentSession()
 
   if (!project) {
     return <ProjectPicker />
@@ -23,8 +26,11 @@ export function App(): React.JSX.Element {
         </h1>
       </div>
       <Separator />
-      <div className="flex-1 overflow-hidden">
-        <AgentPanel projectPath={project.path} />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden">
+          <AgentPanel project={project} session={session} />
+        </div>
+        {session.hasActiveSession ? <SnapshotSidebar snapshots={session.snapshots} /> : null}
       </div>
     </div>
   )

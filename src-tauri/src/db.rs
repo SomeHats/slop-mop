@@ -24,7 +24,18 @@ impl Db {
                 name TEXT NOT NULL,
                 path TEXT NOT NULL UNIQUE,
                 opened_at TEXT NOT NULL DEFAULT (datetime('now'))
-            )",
+            );
+            CREATE TABLE IF NOT EXISTS prompt_snapshots (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                message_id TEXT NOT NULL,
+                prompt_text TEXT NOT NULL,
+                commit_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_prompt_snapshots_session
+                ON prompt_snapshots(session_id, created_at);",
         )
         .map_err(|e| Error::Database(e.to_string()))?;
         Ok(())

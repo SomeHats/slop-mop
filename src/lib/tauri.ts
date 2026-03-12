@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import type { Project } from "./types"
+import type { Project, PromptSnapshot } from "./types"
 
 export function openProject(path: string): Promise<Project> {
   return invoke<Project>("open_project", { path })
@@ -27,4 +27,24 @@ export function writeAgentStdin(agentId: string, data: string): Promise<void> {
 
 export function killAgent(agentId: string): Promise<void> {
   return invoke("kill_agent", { agentId })
+}
+
+export function recordPromptSnapshot(
+  sessionId: string,
+  projectId: string,
+  messageId: string,
+  promptText: string,
+  projectPath: string,
+): Promise<PromptSnapshot> {
+  return invoke<PromptSnapshot>("record_prompt_snapshot", {
+    sessionId,
+    projectId,
+    messageId,
+    promptText,
+    projectPath,
+  })
+}
+
+export function listPromptSnapshots(sessionId: string): Promise<PromptSnapshot[]> {
+  return invoke<PromptSnapshot[]>("list_prompt_snapshots", { sessionId })
 }

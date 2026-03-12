@@ -19,6 +19,16 @@ export type PreviousSession = {
   updatedAt: string | null
 }
 
+export type PromptSnapshot = {
+  id: string
+  session_id: string
+  project_id: string
+  message_id: string
+  prompt_text: string
+  commit_hash: string
+  created_at: string
+}
+
 export type TimelineEntry =
   | { kind: "user_message"; id: string; content: string }
   | { kind: "agent_message"; id: string; content: string }
