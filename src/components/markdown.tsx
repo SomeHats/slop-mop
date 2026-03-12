@@ -1,13 +1,47 @@
+import { Fragment, useEffect, useState } from "react"
 import type { Components } from "react-markdown"
 import ReactMarkdown from "react-markdown"
-import rehypeHighlight from "rehype-highlight"
 
 import { Separator } from "@/components/ui/separator"
+import { highlightTokens, type ThemedToken, tokenStyle } from "@/lib/shiki"
 import { cn } from "@/lib/utils"
 
 type MarkdownProps = {
   content: string
   className?: string
+}
+
+function ShikiCode({ code, language }: { code: string; language: string }): React.JSX.Element {
+  const [lines, setLines] = useState<ThemedToken[][] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    highlightTokens(code, language).then((result) => {
+      if (!cancelled) setLines(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [code, language])
+
+  if (!lines) {
+    return <code className="text-xs">{code}</code>
+  }
+
+  return (
+    <code className="text-xs">
+      {lines.map((line, i) => (
+        <Fragment key={i.toString()}>
+          {i > 0 && "\n"}
+          {line.map((token, j) => (
+            <span key={j.toString()} style={tokenStyle(token)}>
+              {token.content}
+            </span>
+          ))}
+        </Fragment>
+      ))}
+    </code>
+  )
 }
 
 const components: Components = {
@@ -17,9 +51,13 @@ const components: Components = {
     </pre>
   ),
   code: ({ className, children, ...props }) => {
-    const isBlock = className?.startsWith("language-") || className?.startsWith("hljs")
+    const langMatch = className?.match(/language-(\w+)/)
+    if (langMatch?.[1]) {
+      const code = String(children).replace(/\n$/, "")
+      return <ShikiCode code={code} language={langMatch[1]} />
+    }
     return (
-      <code className={cn(isBlock ? className : "bg-muted px-1.5 py-0.5 text-xs")} {...props}>
+      <code className={cn("bg-muted px-1.5 py-0.5 text-xs")} {...props}>
         {children}
       </code>
     )
@@ -85,9 +123,7 @@ const components: Components = {
 export function Markdown({ content, className }: MarkdownProps): React.JSX.Element {
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <ReactMarkdown rehypePlugins={[rehypeHighlight]} components={components}>
-        {content}
-      </ReactMarkdown>
+      <ReactMarkdown components={components}>{content}</ReactMarkdown>
     </div>
   )
 }

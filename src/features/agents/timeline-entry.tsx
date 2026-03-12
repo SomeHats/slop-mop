@@ -1,11 +1,11 @@
 import type { ToolCallContent } from "@agentclientprotocol/sdk"
 import { structuredPatch } from "diff"
-import hljs from "highlight.js"
 import { ChevronRight } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Markdown } from "@/components/markdown"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { highlightTokens, type ThemedToken, tokenStyle } from "@/lib/shiki"
 import type { TimelineEntry } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -25,7 +25,7 @@ export function TimelineEntryRow({ entry }: { entry: TimelineEntry }): React.JSX
 function UserMessageEntry({ content }: { content: string }): React.JSX.Element {
   return (
     <div className="bg-muted px-3 py-2 text-foreground">
-      <span className="mb-1 block text-xs font-medium text-muted-foreground">You</span>
+      <span className="mb-1 block text-xs font-medium text-foreground/60">You</span>
       <Markdown content={content} />
     </div>
   )
@@ -131,9 +131,9 @@ function ToolCallContentItem({ item }: { item: ToolCallContent }): React.JSX.Ele
 
 const EXT_TO_LANGUAGE: Record<string, string> = {
   ts: "typescript",
-  tsx: "typescript",
+  tsx: "tsx",
   js: "javascript",
-  jsx: "javascript",
+  jsx: "jsx",
   rs: "rust",
   py: "python",
   css: "css",
@@ -149,44 +149,6 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   go: "go",
 }
 
-function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-}
-
-function highlightFullText(text: string, language: string | undefined): string[] {
-  if (!text) return []
-  if (!language) return text.split("\n").map(escapeHtml)
-  try {
-    const html = hljs.highlight(text, { language, ignoreIllegals: true }).value
-    return splitHighlightedLines(html)
-  } catch {
-    return text.split("\n").map(escapeHtml)
-  }
-}
-
-function splitHighlightedLines(html: string): string[] {
-  const rawLines = html.split("\n")
-  const result: string[] = []
-  const openTags: string[] = []
-
-  for (const rawLine of rawLines) {
-    let line = openTags.join("") + rawLine
-
-    for (const match of rawLine.matchAll(/<span[^>]*>|<\/span>/g)) {
-      if (match[0] === "</span>") {
-        openTags.pop()
-      } else {
-        openTags.push(match[0])
-      }
-    }
-
-    line += "</span>".repeat(openTags.length)
-    result.push(line)
-  }
-
-  return result
-}
-
 function DiffView({
   path,
   oldText,
@@ -198,10 +160,23 @@ function DiffView({
 }): React.JSX.Element {
   const patch = structuredPatch(path, path, oldText, newText, "", "", { context: 3 })
   const ext = path.split(".").pop()?.toLowerCase()
-  const language = ext ? EXT_TO_LANGUAGE[ext] : undefined
+  const lang = ext ? EXT_TO_LANGUAGE[ext] : undefined
 
-  const oldLines = highlightFullText(oldText, language)
-  const newLines = highlightFullText(newText, language)
+  const [tokens, setTokens] = useState<{ old: ThemedToken[][]; new: ThemedToken[][] } | null>(null)
+
+  useEffect(() => {
+    if (!lang) return
+    let cancelled = false
+    Promise.all([highlightTokens(oldText, lang), highlightTokens(newText, lang)]).then(
+      ([oldResult, newResult]) => {
+        if (cancelled || !oldResult || !newResult) return
+        setTokens({ old: oldResult, new: newResult })
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [oldText, newText, lang])
 
   return (
     <div className="flex flex-col gap-1">
@@ -218,16 +193,16 @@ function DiffView({
               </div>
               {hunk.lines.map((line, lineIndex) => {
                 const prefix = line[0] ?? " "
-                let html: string
+                let lineTokens: ThemedToken[] | undefined
 
                 if (prefix === "-") {
-                  html = oldLines[oldLineNum] ?? escapeHtml(line.slice(1))
+                  lineTokens = tokens?.old[oldLineNum]
                   oldLineNum++
                 } else if (prefix === "+") {
-                  html = newLines[newLineNum] ?? escapeHtml(line.slice(1))
+                  lineTokens = tokens?.new[newLineNum]
                   newLineNum++
                 } else {
-                  html = newLines[newLineNum] ?? oldLines[oldLineNum] ?? escapeHtml(line.slice(1))
+                  lineTokens = tokens?.new[newLineNum] ?? tokens?.old[oldLineNum]
                   oldLineNum++
                   newLineNum++
                 }
@@ -253,8 +228,15 @@ function DiffView({
                     >
                       {prefix}
                     </span>
-                    {/* biome-ignore lint/security/noDangerouslySetInnerHtml: highlight.js output */}
-                    <span dangerouslySetInnerHTML={{ __html: html }} />
+                    {lineTokens ? (
+                      lineTokens.map((token, ti) => (
+                        <span key={ti.toString()} style={tokenStyle(token)}>
+                          {token.content}
+                        </span>
+                      ))
+                    ) : (
+                      <span>{line.slice(1)}</span>
+                    )}
                   </div>
                 )
               })}
