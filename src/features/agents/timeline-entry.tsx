@@ -181,6 +181,10 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   go: "go",
 }
 
+function stripLineNumbers(text: string): string {
+  return text.replace(/^ *\d+→/gm, "")
+}
+
 function FileContentView({
   code,
   language,
@@ -189,18 +193,19 @@ function FileContentView({
   language: string
 }): React.JSX.Element {
   const [lines, setLines] = useState<ThemedToken[][] | null>(null)
+  const stripped = stripLineNumbers(code)
 
   useEffect(() => {
     let cancelled = false
-    highlightTokens(code, language).then((result) => {
+    highlightTokens(stripped, language).then((result) => {
       if (!cancelled) setLines(result)
     })
     return () => {
       cancelled = true
     }
-  }, [code, language])
+  }, [stripped, language])
 
-  const plainLines = code.split("\n")
+  const plainLines = stripped.split("\n")
 
   return (
     <pre className="overflow-x-auto bg-muted text-xs">
