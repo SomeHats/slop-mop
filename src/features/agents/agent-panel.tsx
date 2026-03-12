@@ -50,7 +50,7 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2">
         <h2 className="text-sm font-medium text-foreground">Agent</h2>
         <Button variant="ghost" size="xs" onClick={() => void stopSession()}>
@@ -77,7 +77,7 @@ export function AgentPanel({ projectPath }: AgentPanelProps): React.JSX.Element 
         />
       ) : (
         <>
-          <ScrollArea className="flex-1 overflow-hidden">
+          <ScrollArea className="flex-1 overflow-hidden [&>[data-slot=scroll-area-viewport]>div]:!block">
             <div className="flex flex-col gap-3 p-4">
               {timeline.map((entry) => (
                 <TimelineEntryRow key={entry.id} entry={entry} />

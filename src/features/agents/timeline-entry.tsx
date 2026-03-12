@@ -181,8 +181,13 @@ const EXT_TO_LANGUAGE: Record<string, string> = {
   go: "go",
 }
 
-function stripLineNumbers(text: string): string {
-  return text.replace(/^ *\d+→/gm, "")
+function stripReadFormatting(text: string): string {
+  let s = text
+  // Remove wrapping code fences (```lang ... ```)
+  s = s.replace(/^```\w*\n/, "").replace(/\n```\s*$/, "")
+  // Remove ACP line-number prefixes (e.g. "     1→")
+  s = s.replace(/^ *\d+→/gm, "")
+  return s
 }
 
 function FileContentView({
@@ -193,7 +198,7 @@ function FileContentView({
   language: string
 }): React.JSX.Element {
   const [lines, setLines] = useState<ThemedToken[][] | null>(null)
-  const stripped = stripLineNumbers(code)
+  const stripped = stripReadFormatting(code)
 
   useEffect(() => {
     let cancelled = false

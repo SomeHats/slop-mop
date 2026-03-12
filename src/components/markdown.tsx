@@ -122,7 +122,7 @@ const components: Components = {
 
 export function Markdown({ content, className }: MarkdownProps): React.JSX.Element {
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
+    <div className={cn("flex min-w-0 flex-col gap-2 break-words", className)}>
       <ReactMarkdown components={components}>{content}</ReactMarkdown>
     </div>
   )
