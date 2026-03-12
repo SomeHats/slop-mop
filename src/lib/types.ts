@@ -7,6 +7,12 @@ export type Project = {
   opened_at: string
 }
 
+declare global {
+  interface Window {
+    __PROJECT?: Project
+  }
+}
+
 export type PreviousSession = {
   sessionId: string
   title: string | null

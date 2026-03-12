@@ -1,7 +1,9 @@
 mod agent;
 mod db;
 mod error;
+mod menu;
 mod project;
+mod window;
 
 use tauri::Manager;
 
@@ -19,6 +21,14 @@ pub fn run() {
             let database = db::Db::open(&db_path).expect("failed to open database");
             app.manage(database);
             app.manage(agent::AgentManager::new());
+
+            let handle = app.handle();
+            let m = menu::build_menu(handle).expect("failed to build menu");
+            app.set_menu(m).expect("failed to set menu");
+            app.on_menu_event(move |app, event| {
+                menu::handle_event(app, &event);
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -28,11 +38,31 @@ pub fn run() {
             agent::spawn_agent,
             agent::write_agent_stdin,
             agent::kill_agent,
+            window::open_project_window,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
+                let app = window.app_handle();
+
+                // Kill agents owned by this window
                 if let Some(manager) = window.try_state::<agent::AgentManager>() {
                     manager.kill_all();
+                }
+
+                // If no windows remain (aside from the one being destroyed),
+                // reopen the picker
+                let remaining = app.webview_windows().len();
+                if remaining <= 1 {
+                    let app = app.clone();
+                    // Defer to next tick so the window finishes deregistering
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        if app.webview_windows().is_empty() {
+                            if let Err(e) = window::open_picker_window(&app) {
+                                eprintln!("Failed to reopen picker: {e}");
+                            }
+                        }
+                    });
                 }
             }
         })

@@ -5,6 +5,10 @@ export function openProject(path: string): Promise<Project> {
   return invoke<Project>("open_project", { path })
 }
 
+export function openProjectWindow(path: string): Promise<void> {
+  return invoke("open_project_window", { path })
+}
+
 export function listRecentProjects(): Promise<Project[]> {
   return invoke<Project[]>("list_recent_projects")
 }

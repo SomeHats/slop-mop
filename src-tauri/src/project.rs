@@ -46,9 +46,10 @@ fn get_project_name(path: &Path) -> String {
         .to_string()
 }
 
-#[tauri::command]
-pub fn open_project(db: State<'_, Db>, path: String) -> Result<Project, Error> {
-    let repo_root = resolve_repo_root(Path::new(&path))?;
+/// Resolve a directory path to a git repo root, upsert into the DB, and return the project.
+/// Used by both the `open_project` command and `window::open_project_window`.
+pub fn upsert_project(db: &Db, path: &str) -> Result<Project, Error> {
+    let repo_root = resolve_repo_root(Path::new(path))?;
     let repo_path = repo_root.to_string_lossy().to_string();
     let name = get_project_name(&repo_root);
     let id = uuid::Uuid::new_v4().to_string();
@@ -80,8 +81,7 @@ pub fn open_project(db: State<'_, Db>, path: String) -> Result<Project, Error> {
     Ok(project)
 }
 
-#[tauri::command]
-pub fn list_recent_projects(db: State<'_, Db>) -> Result<Vec<Project>, Error> {
+pub fn list_projects(db: &Db) -> Result<Vec<Project>, Error> {
     let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
 
     let mut stmt = conn
@@ -102,6 +102,16 @@ pub fn list_recent_projects(db: State<'_, Db>) -> Result<Vec<Project>, Error> {
         .map_err(|e| Error::Database(e.to_string()))?;
 
     Ok(projects)
+}
+
+#[tauri::command]
+pub fn open_project(db: State<'_, Db>, path: String) -> Result<Project, Error> {
+    upsert_project(&db, &path)
+}
+
+#[tauri::command]
+pub fn list_recent_projects(db: State<'_, Db>) -> Result<Vec<Project>, Error> {
+    list_projects(&db)
 }
 
 #[tauri::command]

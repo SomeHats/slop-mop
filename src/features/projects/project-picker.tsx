@@ -10,14 +10,10 @@ import {
   ItemGroup,
   ItemTitle,
 } from "@/components/ui/item"
-import { listRecentProjects, openProject, removeProject } from "../../lib/tauri"
+import { listRecentProjects, openProjectWindow, removeProject } from "../../lib/tauri"
 import type { Project } from "../../lib/types"
 
-type ProjectPickerProps = {
-  onProjectOpen: (project: Project) => void
-}
-
-export function ProjectPicker({ onProjectOpen }: ProjectPickerProps): React.JSX.Element {
+export function ProjectPicker(): React.JSX.Element {
   const [recentProjects, setRecentProjects] = useState<Project[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -42,8 +38,7 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps): React.JSX.
 
     setLoading(true)
     try {
-      const project = await openProject(selected)
-      onProjectOpen(project)
+      await openProjectWindow(selected)
     } catch (e) {
       setError(String(e))
     } finally {
@@ -64,8 +59,7 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps): React.JSX.
     setError(null)
     setLoading(true)
     try {
-      const updated = await openProject(project.path)
-      onProjectOpen(updated)
+      await openProjectWindow(project.path)
     } catch (e) {
       setError(String(e))
     } finally {
@@ -74,54 +68,57 @@ export function ProjectPicker({ onProjectOpen }: ProjectPickerProps): React.JSX.
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background text-foreground">
-      <div className="flex w-full max-w-md flex-col gap-6 p-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">Claude Crèche</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Open a git repository to get started.
-          </p>
-        </div>
-
-        <Button className="w-full" size="lg" onClick={() => void handleOpen()} disabled={loading}>
-          {loading ? "Opening..." : "Open Project"}
-        </Button>
-
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-        {recentProjects.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Recent
-            </h2>
-            <ItemGroup>
-              {recentProjects.map((project) => (
-                <Item key={project.id} asChild size="sm" className="cursor-pointer">
-                  <button type="button" onClick={() => void handleSelectRecent(project)}>
-                    <ItemContent>
-                      <ItemTitle>{project.name}</ItemTitle>
-                      <ItemDescription>{project.path}</ItemDescription>
-                    </ItemContent>
-                    <ItemActions>
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          void handleRemove(project.id)
-                        }}
-                        className="opacity-0 group-hover/item:opacity-100"
-                        title="Remove from recent"
-                      >
-                        <X data-icon="inline-start" />
-                      </Button>
-                    </ItemActions>
-                  </button>
-                </Item>
-              ))}
-            </ItemGroup>
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <div className="drag h-12 shrink-0" />
+      <div className="flex flex-1 items-center justify-center">
+        <div className="flex w-full max-w-md flex-col gap-6 p-8">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold tracking-tight">Claude Crèche</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Open a git repository to get started.
+            </p>
           </div>
-        ) : null}
+
+          <Button className="w-full" size="lg" onClick={() => void handleOpen()} disabled={loading}>
+            {loading ? "Opening..." : "Open Project"}
+          </Button>
+
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+          {recentProjects.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Recent
+              </h2>
+              <ItemGroup>
+                {recentProjects.map((project) => (
+                  <Item key={project.id} asChild size="sm" className="cursor-pointer">
+                    <button type="button" onClick={() => void handleSelectRecent(project)}>
+                      <ItemContent>
+                        <ItemTitle>{project.name}</ItemTitle>
+                        <ItemDescription>{project.path}</ItemDescription>
+                      </ItemContent>
+                      <ItemActions>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void handleRemove(project.id)
+                          }}
+                          className="opacity-0 group-hover/item:opacity-100"
+                          title="Remove from recent"
+                        >
+                          <X data-icon="inline-start" />
+                        </Button>
+                      </ItemActions>
+                    </button>
+                  </Item>
+                ))}
+              </ItemGroup>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   )

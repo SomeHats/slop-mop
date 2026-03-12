@@ -22,6 +22,9 @@ pub enum Error {
 
     #[error("Agent stdin write failed: {0}")]
     AgentStdinWrite(String),
+
+    #[error("Window error: {0}")]
+    Window(String),
 }
 
 impl Serialize for Error {

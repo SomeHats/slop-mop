@@ -12,10 +12,14 @@
   "app": {
     "windows": [
       {
+        "label": "picker",
         "title": "Claude Crèche",
-        "width": 1200,
-        "height": 800,
-        "resizable": true
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "width": 600,
+        "height": 500,
+        "resizable": true,
+        "center": true
       }
     ],
     "security": {
