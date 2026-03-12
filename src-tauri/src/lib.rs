@@ -1,5 +1,6 @@
 mod agent;
 mod db;
+mod diff;
 mod error;
 mod menu;
 mod project;
@@ -43,6 +44,8 @@ pub fn run() {
             snapshot::record_prompt_snapshot,
             snapshot::list_prompt_snapshots,
             window::open_project_window,
+            diff::batch_diff_stats,
+            diff::get_repo_diff,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

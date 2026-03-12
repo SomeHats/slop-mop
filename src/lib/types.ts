@@ -29,6 +29,34 @@ export type PromptSnapshot = {
   created_at: string
 }
 
+export type DiffStats = {
+  snapshot_id: string
+  additions: number
+  deletions: number
+}
+
+export type HunkLine = {
+  origin: string
+  content: string
+}
+
+export type DiffHunk = {
+  old_start: number
+  old_lines: number
+  new_start: number
+  new_lines: number
+  lines: HunkLine[]
+}
+
+export type FileDiff = {
+  path: string
+  status: string
+  old_path: string | null
+  hunks: DiffHunk[]
+  additions: number
+  deletions: number
+}
+
 export type TimelineEntry =
   | { kind: "user_message"; id: string; content: string }
   | { kind: "system_message"; id: string; content: string }

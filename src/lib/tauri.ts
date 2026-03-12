@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import type { Project, PromptSnapshot } from "./types"
+import type { DiffStats, FileDiff, Project, PromptSnapshot } from "./types"
 
 export function openProject(path: string): Promise<Project> {
   return invoke<Project>("open_project", { path })
@@ -51,4 +51,15 @@ export function recordPromptSnapshot(
 
 export function listPromptSnapshots(sessionId: string): Promise<PromptSnapshot[]> {
   return invoke<PromptSnapshot[]>("list_prompt_snapshots", { sessionId })
+}
+
+export function batchDiffStats(
+  projectPath: string,
+  snapshotHashes: [string, string][],
+): Promise<DiffStats[]> {
+  return invoke<DiffStats[]>("batch_diff_stats", { projectPath, snapshotHashes })
+}
+
+export function getRepoDiff(projectPath: string, commitHash: string): Promise<FileDiff[]> {
+  return invoke<FileDiff[]>("get_repo_diff", { projectPath, commitHash })
 }
