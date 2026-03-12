@@ -13,7 +13,8 @@ function truncate(text: string, max: number): string {
 }
 
 function formatTime(iso: string): string {
-  const date = new Date(iso)
+  // SQLite datetime('now') produces UTC without a Z suffix — ensure it's parsed as UTC
+  const date = new Date(iso.endsWith("Z") ? iso : `${iso}Z`)
   const hours = date.getHours().toString().padStart(2, "0")
   const minutes = date.getMinutes().toString().padStart(2, "0")
   return `${hours}:${minutes}`
