@@ -2,12 +2,20 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Claude Crèche",
   "version": "0.0.1",
-  "identifier": "com.claude-creche.app",
+  "identifier": "com.claude-creche.desktop",
   "build": {
-    "beforeBuildCommand": "pnpm build",
+    "beforeBuildCommand": "pnpm build:frontend",
     "beforeDevCommand": "pnpm dev:vite",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "resources": {
+      "agent-bundle/claude-agent-acp.mjs": "agent-bundle/claude-agent-acp.mjs",
+      "agent-bundle/cli.js": "agent-bundle/cli.js"
+    }
   },
   "app": {
     "windows": [

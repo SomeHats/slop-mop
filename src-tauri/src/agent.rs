@@ -2,26 +2,95 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::error::Error;
 
 const BINARY_NAME: &str = "claude-agent-acp";
+const BUNDLED_SCRIPT: &str = "agent-bundle/claude-agent-acp.mjs";
 
-/// Resolve the claude-agent-acp binary path.
-/// Checks node_modules/.bin/ relative to the Cargo manifest dir (i.e. the project root's
-/// node_modules) first, then falls back to bare name (PATH lookup).
-fn resolve_agent_binary() -> PathBuf {
-    let local = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../node_modules/.bin")
-        .join(BINARY_NAME);
-    if local.exists() {
-        return local;
+/// Get the user's login shell PATH (cached).
+/// macOS GUI apps launched from Finder get a minimal PATH that doesn't include
+/// brew, nvm, etc. We resolve the full PATH once by asking the user's shell.
+fn shell_path() -> &'static str {
+    static PATH: OnceLock<String> = OnceLock::new();
+    PATH.get_or_init(|| {
+        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+        Command::new(&shell)
+            .args(["-ilc", "echo $PATH"])
+            .stderr(Stdio::null())
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| std::env::var("PATH").unwrap_or_default())
+    })
+}
+
+/// Find `node` on the user's shell PATH.
+fn find_node() -> Option<PathBuf> {
+    for dir in shell_path().split(':') {
+        let candidate = PathBuf::from(dir).join("node");
+        if candidate.exists() {
+            return Some(candidate);
+        }
     }
-    PathBuf::from(BINARY_NAME)
+    None
+}
+
+/// How to launch the agent process.
+enum AgentLaunch {
+    /// Run `node <script>` using the bundled JS files in the app's resources.
+    Bundled { node: PathBuf, script: PathBuf },
+    /// Run the standalone binary/script directly (dev mode or PATH fallback).
+    Direct { binary: PathBuf },
+}
+
+/// Resolve the best way to launch claude-agent-acp.
+/// Priority:
+/// 1. Bundled JS in the app's resource directory (works in .app bundles)
+/// 2. node_modules/.bin/ relative to the dev build (works during `tauri dev`)
+/// 3. Bare binary name on the user's shell PATH
+fn resolve_agent_launch(app: &AppHandle) -> AgentLaunch {
+    // 1. Try bundled resource
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let script = resource_dir.join(BUNDLED_SCRIPT);
+        if script.exists() {
+            if let Some(node) = find_node() {
+                return AgentLaunch::Bundled { node, script };
+            }
+        }
+    }
+
+    // 2. Dev build: exe is at src-tauri/target/{debug,release}/claude-creche
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            let dev_local = exe_dir
+                .join("../../../node_modules/.bin")
+                .join(BINARY_NAME);
+            if dev_local.exists() {
+                return AgentLaunch::Direct { binary: dev_local };
+            }
+        }
+    }
+
+    // 3. Search the user's shell PATH
+    for dir in shell_path().split(':') {
+        let candidate = PathBuf::from(dir).join(BINARY_NAME);
+        if candidate.exists() {
+            return AgentLaunch::Direct {
+                binary: candidate,
+            };
+        }
+    }
+
+    AgentLaunch::Direct {
+        binary: PathBuf::from(BINARY_NAME),
+    }
 }
 
 pub struct AgentProcess {
@@ -66,26 +135,33 @@ pub fn spawn_agent(
     manager: State<'_, AgentManager>,
     project_path: String,
 ) -> Result<String, Error> {
-    let bin = resolve_agent_binary();
-    let mut child = Command::new(&bin)
+    let launch = resolve_agent_launch(&app);
+    let (display_name, mut cmd) = match &launch {
+        AgentLaunch::Bundled { node, script } => {
+            let mut c = Command::new(node);
+            c.arg(script);
+            (format!("node {}", script.display()), c)
+        }
+        AgentLaunch::Direct { binary } => {
+            (binary.display().to_string(), Command::new(binary))
+        }
+    };
+    let mut child = cmd
         .current_dir(&project_path)
+        .env("PATH", shell_path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .spawn()
         .map_err(|e| match e.kind() {
             std::io::ErrorKind::NotFound => Error::AgentSpawnFailed(format!(
-                "\"claude-agent-acp\" not found (tried {}). \
-                 Run `pnpm add @zed-industries/claude-agent-acp` in the project root.",
-                bin.display()
+                "Agent not found (tried {display_name}). Is Node.js installed?",
             )),
             std::io::ErrorKind::PermissionDenied => Error::AgentSpawnFailed(format!(
-                "Permission denied running \"{}\": {e}",
-                bin.display()
+                "Permission denied running \"{display_name}\": {e}",
             )),
             _ => Error::AgentSpawnFailed(format!(
-                "Failed to spawn \"{}\": {e}",
-                bin.display()
+                "Failed to spawn \"{display_name}\": {e}",
             )),
         })?;
 
