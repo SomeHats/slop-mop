@@ -39,6 +39,7 @@ pub fn run() {
             agent::spawn_agent,
             agent::write_agent_stdin,
             agent::kill_agent,
+            snapshot::is_worktree_dirty,
             snapshot::record_prompt_snapshot,
             snapshot::list_prompt_snapshots,
             window::open_project_window,

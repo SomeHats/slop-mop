@@ -12,7 +12,13 @@ import {
 } from "@agentclientprotocol/sdk"
 import { useCallback, useRef, useState } from "react"
 import { createAgentStream } from "../lib/agent-stream"
-import { killAgent, listPromptSnapshots, recordPromptSnapshot, spawnAgent } from "../lib/tauri"
+import {
+  isWorktreeDirty,
+  killAgent,
+  listPromptSnapshots,
+  recordPromptSnapshot,
+  spawnAgent,
+} from "../lib/tauri"
 import type { PreviousSession, PromptSnapshot, TimelineEntry } from "../lib/types"
 
 type AgentSessionState = {
@@ -346,33 +352,56 @@ export function useAgentSession(): AgentSession {
     const projectPath = projectPathRef.current
     if (!connection || !sessionId) return
 
-    const messageId = crypto.randomUUID()
-
-    const userEntry: TimelineEntry = {
-      kind: "user_message",
-      id: messageId,
-      content: text,
-    }
-    setState((prev) => ({
-      ...prev,
-      timeline: [...prev.timeline, userEntry],
-      isProcessing: true,
-      error: null,
-    }))
-
-    // Fire-and-forget snapshot recording
-    if (projectId && projectPath) {
-      recordPromptSnapshot(sessionId, projectId, messageId, text, projectPath).then(
-        (snapshot) => {
-          setState((prev) => ({ ...prev, snapshots: [...prev.snapshots, snapshot] }))
-        },
-        () => {
-          // Snapshot failure is non-critical
-        },
-      )
-    }
+    setState((prev) => ({ ...prev, isProcessing: true, error: null }))
 
     try {
+      // Ensure worktree is clean so the snapshot commit hash is accurate
+      if (projectPath) {
+        const dirty = await isWorktreeDirty(projectPath)
+        if (dirty) {
+          // Ask the agent to commit, then verify
+          await connection.prompt({
+            sessionId,
+            prompt: [{ type: "text", text: "commit" }],
+          })
+
+          const stillDirty = await isWorktreeDirty(projectPath)
+          if (stillDirty) {
+            setState((prev) => ({
+              ...prev,
+              isProcessing: false,
+              error:
+                "Worktree still has uncommitted changes after auto-commit. Please commit or stash manually.",
+            }))
+            return
+          }
+        }
+      }
+
+      const messageId = crypto.randomUUID()
+
+      const userEntry: TimelineEntry = {
+        kind: "user_message",
+        id: messageId,
+        content: text,
+      }
+      setState((prev) => ({
+        ...prev,
+        timeline: [...prev.timeline, userEntry],
+      }))
+
+      // Record snapshot now that we know the worktree is clean
+      if (projectId && projectPath) {
+        recordPromptSnapshot(sessionId, projectId, messageId, text, projectPath).then(
+          (snapshot) => {
+            setState((prev) => ({ ...prev, snapshots: [...prev.snapshots, snapshot] }))
+          },
+          () => {
+            // Snapshot failure is non-critical
+          },
+        )
+      }
+
       await connection.prompt({
         sessionId,
         messageId,

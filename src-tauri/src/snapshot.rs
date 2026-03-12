@@ -26,6 +26,20 @@ fn get_head_commit_hash(path: &Path) -> Result<String, Error> {
 }
 
 #[tauri::command]
+pub fn is_worktree_dirty(project_path: String) -> Result<bool, Error> {
+    let repo = git2::Repository::discover(Path::new(&project_path))
+        .map_err(|_| Error::NotAGitRepo(project_path.clone()))?;
+    let statuses = repo
+        .statuses(Some(
+            git2::StatusOptions::new()
+                .include_untracked(true)
+                .recurse_untracked_dirs(true),
+        ))
+        .map_err(Error::Git)?;
+    Ok(!statuses.is_empty())
+}
+
+#[tauri::command]
 pub fn record_prompt_snapshot(
     db: State<'_, Db>,
     session_id: String,

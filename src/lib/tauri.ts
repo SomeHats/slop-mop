@@ -29,6 +29,10 @@ export function killAgent(agentId: string): Promise<void> {
   return invoke("kill_agent", { agentId })
 }
 
+export function isWorktreeDirty(projectPath: string): Promise<boolean> {
+  return invoke<boolean>("is_worktree_dirty", { projectPath })
+}
+
 export function recordPromptSnapshot(
   sessionId: string,
   projectId: string,
