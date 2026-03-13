@@ -38,6 +38,8 @@ export type DiffStats = {
 export type HunkLine = {
   origin: string
   content: string
+  old_line_no: number | null
+  new_line_no: number | null
 }
 
 export type DiffHunk = {

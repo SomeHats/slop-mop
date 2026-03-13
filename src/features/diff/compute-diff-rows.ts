@@ -1,0 +1,184 @@
+import type { DiffHunk } from "@/lib/types"
+
+export type LineData = {
+  lineNo: number
+  content: string
+  type: "context" | "addition" | "deletion"
+}
+
+export type SideBySideRow =
+  | { kind: "paired"; left: LineData | null; right: LineData | null }
+  | { kind: "collapsed"; count: number; regionIndex: number }
+
+export type RegionExpansion = {
+  top: number
+  bottom: number
+}
+
+const CONTEXT_LINES = 3
+export const EXPAND_STEP = 20
+
+/**
+ * Converts hunk lines into side-by-side paired rows.
+ * Context lines → both sides. Deletions → left only. Additions → right only.
+ * Adjacent deletion/addition blocks get zipped into paired modification rows.
+ */
+export function computeRows(hunks: DiffHunk[]): SideBySideRow[] {
+  const rows: SideBySideRow[] = []
+
+  for (const hunk of hunks) {
+    let i = 0
+    while (i < hunk.lines.length) {
+      const line = hunk.lines[i]
+      if (!line) {
+        i++
+        continue
+      }
+
+      if (line.origin === " ") {
+        rows.push({
+          kind: "paired",
+          left: { lineNo: line.old_line_no ?? 0, content: line.content, type: "context" },
+          right: { lineNo: line.new_line_no ?? 0, content: line.content, type: "context" },
+        })
+        i++
+        continue
+      }
+
+      // Collect consecutive deletion/addition block
+      const deletions: LineData[] = []
+      const additions: LineData[] = []
+
+      for (let del = hunk.lines[i]; del && del.origin === "-"; del = hunk.lines[++i]) {
+        deletions.push({ lineNo: del.old_line_no ?? 0, content: del.content, type: "deletion" })
+      }
+
+      for (let add = hunk.lines[i]; add && add.origin === "+"; add = hunk.lines[++i]) {
+        additions.push({ lineNo: add.new_line_no ?? 0, content: add.content, type: "addition" })
+      }
+
+      // Zip deletions and additions into paired rows
+      const maxLen = Math.max(deletions.length, additions.length)
+      for (let j = 0; j < maxLen; j++) {
+        rows.push({
+          kind: "paired",
+          left: deletions[j] ?? null,
+          right: additions[j] ?? null,
+        })
+      }
+    }
+  }
+
+  return rows
+}
+
+function pushSlice(
+  result: SideBySideRow[],
+  source: SideBySideRow[],
+  from: number,
+  to: number,
+): void {
+  for (let i = from; i < to; i++) {
+    const row = source[i]
+    if (row) result.push(row)
+  }
+}
+
+/**
+ * Collapses long runs of consecutive context rows.
+ * Each region tracks how many extra lines are revealed from the top and bottom
+ * via the expansions map. Chevron clicks increment these values by EXPAND_STEP.
+ */
+export function collapseRows(
+  rows: SideBySideRow[],
+  expansions: Map<number, RegionExpansion>,
+): SideBySideRow[] {
+  // Identify runs of consecutive context rows
+  type Run = { start: number; length: number }
+  const runs: Run[] = []
+  let runStart = -1
+  let runLength = 0
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    const isContext =
+      row?.kind === "paired" && row.left?.type === "context" && row.right?.type === "context"
+
+    if (isContext) {
+      if (runStart === -1) {
+        runStart = i
+        runLength = 1
+      } else {
+        runLength++
+      }
+    } else {
+      if (runStart !== -1) {
+        runs.push({ start: runStart, length: runLength })
+        runStart = -1
+        runLength = 0
+      }
+    }
+  }
+  if (runStart !== -1) {
+    runs.push({ start: runStart, length: runLength })
+  }
+
+  const result: SideBySideRow[] = []
+  let cursor = 0
+  const threshold = CONTEXT_LINES * 2 + 1
+
+  for (let regionIndex = 0; regionIndex < runs.length; regionIndex++) {
+    const run = runs[regionIndex]
+    if (!run) continue
+    const runEnd = run.start + run.length
+    const isAtStart = run.start === 0
+    const isAtEnd = runEnd === rows.length
+
+    // Emit rows before this run
+    pushSlice(result, rows, cursor, run.start)
+    cursor = run.start
+
+    if (run.length <= threshold) {
+      // Short run — emit all, no collapsing
+      pushSlice(result, rows, cursor, runEnd)
+      cursor = runEnd
+      continue
+    }
+
+    const expansion = expansions.get(regionIndex)
+    const revealedTop = expansion?.top ?? 0
+    const revealedBottom = expansion?.bottom ?? 0
+
+    // Base visible lines at each boundary
+    const baseTop = isAtStart ? 0 : CONTEXT_LINES
+    const baseBottom = isAtEnd ? 0 : CONTEXT_LINES
+
+    const showTop = baseTop + revealedTop
+    const showBottom = baseBottom + revealedBottom
+    const totalVisible = showTop + showBottom
+    const remaining = run.length - totalVisible
+
+    if (remaining <= 0) {
+      // Fully revealed
+      pushSlice(result, rows, cursor, runEnd)
+      cursor = runEnd
+    } else {
+      // Top visible lines
+      if (showTop > 0) {
+        pushSlice(result, rows, run.start, run.start + showTop)
+      }
+      // Collapsed marker
+      result.push({ kind: "collapsed", count: remaining, regionIndex })
+      // Bottom visible lines
+      if (showBottom > 0) {
+        pushSlice(result, rows, runEnd - showBottom, runEnd)
+      }
+      cursor = runEnd
+    }
+  }
+
+  // Emit remaining rows after last run
+  pushSlice(result, rows, cursor, rows.length)
+
+  return result
+}

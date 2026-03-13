@@ -6,6 +6,7 @@ import { Markdown } from "@/components/markdown"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { useScrollIntoView } from "@/hooks/use-scroll-into-view"
+import { EXT_TO_LANGUAGE, langFromPath } from "@/lib/lang"
 import { highlightTokens, type ThemedToken, tokenStyle } from "@/lib/shiki"
 import type { TimelineEntry } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -129,11 +130,6 @@ function ToolCallEntry({
   )
 }
 
-function langFromPath(filePath: string): string | undefined {
-  const ext = filePath.split(".").pop()?.toLowerCase()
-  return ext ? EXT_TO_LANGUAGE[ext] : undefined
-}
-
 function ToolCallContentView({
   content,
   toolKind,
@@ -183,26 +179,6 @@ function ToolCallContentItem({
     default:
       return <span>Unknown content</span>
   }
-}
-
-const EXT_TO_LANGUAGE: Record<string, string> = {
-  ts: "typescript",
-  tsx: "tsx",
-  js: "javascript",
-  jsx: "jsx",
-  rs: "rust",
-  py: "python",
-  css: "css",
-  html: "html",
-  json: "json",
-  md: "markdown",
-  toml: "toml",
-  yaml: "yaml",
-  yml: "yaml",
-  sh: "bash",
-  bash: "bash",
-  sql: "sql",
-  go: "go",
 }
 
 function stripReadFormatting(text: string): string {

@@ -16,6 +16,8 @@ pub struct DiffStats {
 pub struct HunkLine {
     pub origin: char,
     pub content: String,
+    pub old_line_no: Option<u32>,
+    pub new_line_no: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -70,7 +72,8 @@ fn diff_between_commits<'a>(
     let new_tree = new_commit.tree().map_err(Error::Git)?;
 
     let mut opts = DiffOptions::new();
-    opts.include_untracked(true);
+    opts.include_untracked(true)
+        .context_lines(100_000);
 
     repo.diff_tree_to_tree(Some(&old_tree), Some(&new_tree), Some(&mut opts))
         .map_err(Error::Git)
@@ -87,7 +90,8 @@ fn diff_commit_to_workdir<'a>(repo: &'a Repository, hash: &str) -> Result<git2::
 
     let mut opts = DiffOptions::new();
     opts.include_untracked(true)
-        .recurse_untracked_dirs(true);
+        .recurse_untracked_dirs(true)
+        .context_lines(100_000);
 
     repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))
         .map_err(Error::Git)
@@ -202,7 +206,12 @@ pub fn get_repo_diff(project_path: String, commit_hash: String) -> Result<Vec<Fi
                 if let Some(current_hunk) = file_entry.hunks.last_mut() {
                     let content =
                         std::str::from_utf8(line.content()).unwrap_or("").to_string();
-                    current_hunk.lines.push(HunkLine { origin, content });
+                    current_hunk.lines.push(HunkLine {
+                        origin,
+                        content,
+                        old_line_no: line.old_lineno(),
+                        new_line_no: line.new_lineno(),
+                    });
 
                     if origin == '+' {
                         file_entry.additions += 1;
