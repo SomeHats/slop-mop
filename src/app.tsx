@@ -10,6 +10,8 @@ import { useDiffStats } from "./hooks/use-diff-stats"
 import { useFullscreen } from "./hooks/use-fullscreen"
 import { useRepoDiff } from "./hooks/use-repo-diff"
 
+type ViewingOutput = { kind: "snapshot"; snapshotId: string } | { kind: "auto-commit" } | null
+
 const project = window.__PROJECT
 
 export function App(): React.JSX.Element {
@@ -17,10 +19,17 @@ export function App(): React.JSX.Element {
   const session = useAgentSession()
 
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null)
-  const [viewingOutputSnapshotId, setViewingOutputSnapshotId] = useState<string | null>(null)
+  const [viewingOutput, setViewingOutput] = useState<ViewingOutput>(null)
 
-  const { snapshots, hasActiveSession, isConnected, isProcessing, previousSessions, error } =
-    session
+  const {
+    snapshots,
+    hasActiveSession,
+    isConnected,
+    isProcessing,
+    previousSessions,
+    error,
+    autoCommitPhase,
+  } = session
 
   // Connect to the agent on mount
   useEffect(() => {
@@ -40,7 +49,10 @@ export function App(): React.JSX.Element {
   const diffStats = useDiffStats(project?.path ?? "", snapshots)
 
   const selectedSnapshot = snapshots.find((s) => s.id === selectedSnapshotId) ?? null
-  const viewingOutputSnapshot = snapshots.find((s) => s.id === viewingOutputSnapshotId) ?? null
+  const viewingOutputSnapshot =
+    viewingOutput?.kind === "snapshot"
+      ? (snapshots.find((s) => s.id === viewingOutput.snapshotId) ?? null)
+      : null
 
   const { fileDiffs, isLoading: isDiffLoading } = useRepoDiff(
     project?.path ?? "",
@@ -87,8 +99,10 @@ export function App(): React.JSX.Element {
               diffStats={diffStats}
               selectedSnapshotId={selectedSnapshotId}
               onSelectSnapshot={setSelectedSnapshotId}
-              onViewOutput={setViewingOutputSnapshotId}
+              onViewOutput={(id) => setViewingOutput({ kind: "snapshot", snapshotId: id })}
               isProcessing={isProcessing}
+              autoCommitPhase={autoCommitPhase}
+              onViewAutoCommit={() => setViewingOutput({ kind: "auto-commit" })}
             />
             <div className="flex-1 overflow-hidden">
               <DiffPanel
@@ -97,14 +111,20 @@ export function App(): React.JSX.Element {
                 selectedSnapshot={selectedSnapshot}
                 onSendPrompt={handleSendPrompt}
                 isProcessing={isProcessing}
+                timeline={session.timeline}
               />
             </div>
             <PromptOutputDialog
               snapshot={viewingOutputSnapshot}
               timeline={session.timeline}
               isProcessing={isProcessing}
-              open={viewingOutputSnapshotId !== null}
-              onClose={() => setViewingOutputSnapshotId(null)}
+              open={viewingOutput !== null}
+              onClose={() => setViewingOutput(null)}
+              autoCommitAnchorId={
+                viewingOutput?.kind === "auto-commit"
+                  ? (autoCommitPhase?.timelineAnchorId ?? null)
+                  : null
+              }
             />
           </>
         ) : isConnected ? (

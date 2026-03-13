@@ -18,6 +18,7 @@ type PromptOutputDialogProps = {
   isProcessing: boolean
   open: boolean
   onClose: () => void
+  autoCommitAnchorId: string | null
 }
 
 function sliceTimelineForSnapshot(timeline: TimelineEntry[], messageId: string): TimelineEntry[] {
@@ -33,31 +34,58 @@ function sliceTimelineForSnapshot(timeline: TimelineEntry[], messageId: string):
   return endIndex === -1 ? timeline.slice(startIndex) : timeline.slice(startIndex, endIndex)
 }
 
+function sliceTimelineForAutoCommit(timeline: TimelineEntry[], anchorId: string): TimelineEntry[] {
+  const startIndex = timeline.findIndex(
+    (entry) => entry.kind === "system_message" && entry.id === anchorId,
+  )
+  if (startIndex === -1) return []
+
+  const endIndex = timeline.findIndex((entry, i) => i > startIndex && entry.kind === "user_message")
+
+  return endIndex === -1 ? timeline.slice(startIndex) : timeline.slice(startIndex, endIndex)
+}
+
 export function PromptOutputDialog({
   snapshot,
   timeline,
   isProcessing,
   open,
   onClose,
+  autoCommitAnchorId,
 }: PromptOutputDialogProps): React.JSX.Element {
+  const isAutoCommitMode = autoCommitAnchorId != null
+
   const slicedTimeline = useMemo(() => {
+    if (isAutoCommitMode) {
+      return sliceTimelineForAutoCommit(timeline, autoCommitAnchorId)
+    }
     if (!snapshot) return []
     return sliceTimelineForSnapshot(timeline, snapshot.message_id)
-  }, [snapshot, timeline])
+  }, [snapshot, timeline, isAutoCommitMode, autoCommitAnchorId])
 
   const segments = useMemo(() => groupTimeline(slicedTimeline), [slicedTimeline])
 
-  const isActive = isProcessing && snapshot != null && slicedTimeline.length > 0
+  const isActive = isProcessing && slicedTimeline.length > 0
+
+  const title = isAutoCommitMode
+    ? "Auto-commit"
+    : snapshot
+      ? truncate(snapshot.prompt_text, 80)
+      : "Prompt Output"
+
+  const description = isAutoCommitMode
+    ? "Committing uncommitted changes"
+    : snapshot
+      ? `Commit ${snapshot.commit_hash.slice(0, 7)}`
+      : ""
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            {snapshot ? truncate(snapshot.prompt_text, 80) : "Prompt Output"}
-          </DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {snapshot ? `Commit ${snapshot.commit_hash.slice(0, 7)}` : ""}
+            {description}
             {isActive ? " — running" : ""}
           </DialogDescription>
         </DialogHeader>

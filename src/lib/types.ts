@@ -72,3 +72,7 @@ export type TimelineEntry =
       rawInput?: unknown
       rawOutput?: unknown
     }
+
+export type AutoCommitPhase =
+  | { status: "running"; timelineAnchorId: string }
+  | { status: "failed"; timelineAnchorId: string; error: string }

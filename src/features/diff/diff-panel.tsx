@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import type { FileDiff, PromptSnapshot } from "@/lib/types"
+import type { FileDiff, PromptSnapshot, TimelineEntry } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { ExecutionPreview } from "../agents/execution-preview"
 
 type DiffPanelProps = {
   fileDiffs: FileDiff[]
@@ -14,6 +15,7 @@ type DiffPanelProps = {
   selectedSnapshot: PromptSnapshot | null
   onSendPrompt: (text: string) => void
   isProcessing: boolean
+  timeline: TimelineEntry[]
 }
 
 const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -29,6 +31,7 @@ export function DiffPanel({
   selectedSnapshot,
   onSendPrompt,
   isProcessing,
+  timeline,
 }: DiffPanelProps): React.JSX.Element {
   const [input, setInput] = useState("")
 
@@ -65,6 +68,7 @@ export function DiffPanel({
       )}
 
       <Separator />
+      <ExecutionPreview timeline={timeline} isProcessing={isProcessing} />
       <form onSubmit={handleSubmit} className="flex gap-2 p-3">
         <Input
           value={input}

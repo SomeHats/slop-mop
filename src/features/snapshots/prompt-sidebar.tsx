@@ -1,8 +1,9 @@
 import { Eye, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import type { DiffStats, PromptSnapshot } from "@/lib/types"
+import type { AutoCommitPhase, DiffStats, PromptSnapshot } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { AutoCommitEntry } from "./auto-commit-entry"
 
 type PromptSidebarProps = {
   snapshots: PromptSnapshot[]
@@ -11,6 +12,8 @@ type PromptSidebarProps = {
   onSelectSnapshot: (id: string) => void
   onViewOutput: (id: string) => void
   isProcessing: boolean
+  autoCommitPhase: AutoCommitPhase | null
+  onViewAutoCommit: () => void
 }
 
 function truncate(text: string, max: number): string {
@@ -32,6 +35,8 @@ export function PromptSidebar({
   onSelectSnapshot,
   onViewOutput,
   isProcessing,
+  autoCommitPhase,
+  onViewAutoCommit,
 }: PromptSidebarProps): React.JSX.Element {
   return (
     <div className="flex w-72 flex-col border-r border-border bg-background">
@@ -97,6 +102,9 @@ export function PromptSidebar({
           </div>
         </ScrollArea>
       )}
+      {autoCommitPhase ? (
+        <AutoCommitEntry phase={autoCommitPhase} onViewOutput={onViewAutoCommit} />
+      ) : null}
     </div>
   )
 }

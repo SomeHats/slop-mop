@@ -19,7 +19,7 @@ import {
   recordPromptSnapshot,
   spawnAgent,
 } from "../lib/tauri"
-import type { PreviousSession, PromptSnapshot, TimelineEntry } from "../lib/types"
+import type { AutoCommitPhase, PreviousSession, PromptSnapshot, TimelineEntry } from "../lib/types"
 
 type AgentSessionState = {
   timeline: TimelineEntry[]
@@ -29,6 +29,7 @@ type AgentSessionState = {
   hasActiveSession: boolean
   previousSessions: PreviousSession[]
   error: string | null
+  autoCommitPhase: AutoCommitPhase | null
 }
 
 export type AgentSession = AgentSessionState & {
@@ -60,6 +61,7 @@ const INITIAL_STATE: AgentSessionState = {
   hasActiveSession: false,
   previousSessions: [],
   error: null,
+  autoCommitPhase: null,
 }
 
 export function useAgentSession(): AgentSession {
@@ -359,15 +361,18 @@ export function useAgentSession(): AgentSession {
       if (projectPath) {
         const dirty = await isWorktreeDirty(projectPath)
         if (dirty) {
+          const anchorId = `auto-commit-${Date.now().toString()}`
+
           // Show the auto-commit prompt in the timeline as a system message
           const commitEntry: TimelineEntry = {
             kind: "system_message",
-            id: generateMessageId(),
+            id: anchorId,
             content: "Uncommitted changes detected — asking agent to commit before proceeding.",
           }
           setState((prev) => ({
             ...prev,
             timeline: [...prev.timeline, commitEntry],
+            autoCommitPhase: { status: "running", timelineAnchorId: anchorId },
           }))
 
           // Ask the agent to commit, then verify
@@ -381,11 +386,19 @@ export function useAgentSession(): AgentSession {
             setState((prev) => ({
               ...prev,
               isProcessing: false,
-              error:
-                "Worktree still has uncommitted changes after auto-commit. Please commit or stash manually.",
+              autoCommitPhase: {
+                status: "failed",
+                timelineAnchorId: anchorId,
+                error: "Worktree still has uncommitted changes after auto-commit.",
+              },
             }))
             return
           }
+
+          setState((prev) => ({ ...prev, autoCommitPhase: null }))
+        } else {
+          // Non-dirty branch: clear any previous failed auto-commit phase
+          setState((prev) => (prev.autoCommitPhase ? { ...prev, autoCommitPhase: null } : prev))
         }
       }
 
