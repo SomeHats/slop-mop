@@ -1,8 +1,14 @@
 import { Loader2 } from "lucide-react"
-import { type FormEvent, useState } from "react"
+import {
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  useCallback,
+  useRef,
+  useState,
+} from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import type { FileDiff, PromptSnapshot, TimelineEntry } from "@/lib/types"
@@ -34,13 +40,37 @@ export function DiffPanel({
   timeline,
 }: DiffPanelProps): React.JSX.Element {
   const [input, setInput] = useState("")
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const resizeTextarea = useCallback((): void => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${Math.min(el.scrollHeight, 160).toString()}px`
+  }, [])
+
+  const handleChange = useCallback(
+    (e: ChangeEvent<HTMLTextAreaElement>): void => {
+      setInput(e.target.value)
+      resizeTextarea()
+    },
+    [resizeTextarea],
+  )
 
   const handleSubmit = (e: FormEvent): void => {
     e.preventDefault()
     const text = input.trim()
     if (!text || isProcessing) return
     setInput("")
+    resizeTextarea()
     onSendPrompt(text)
+  }
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit(e)
+    }
   }
 
   return (
@@ -69,12 +99,16 @@ export function DiffPanel({
 
       <Separator />
       <ExecutionPreview timeline={timeline} isProcessing={isProcessing} />
-      <form onSubmit={handleSubmit} className="flex gap-2 p-3">
-        <Input
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 p-3">
+        <textarea
+          ref={textareaRef}
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
           placeholder="Send a message..."
           disabled={isProcessing}
+          rows={1}
+          className="field-sizing-content max-h-40 min-h-9 flex-1 resize-none border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         />
         <Button type="submit" disabled={isProcessing || !input.trim()}>
           Send

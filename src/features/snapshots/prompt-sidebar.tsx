@@ -16,11 +16,6 @@ type PromptSidebarProps = {
   onViewAutoCommit: () => void
 }
 
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text
-  return `${text.slice(0, max)}...`
-}
-
 function formatTime(iso: string): string {
   const date = new Date(iso.endsWith("Z") ? iso : `${iso}Z`)
   const hours = date.getHours().toString().padStart(2, "0")
@@ -64,8 +59,8 @@ export function PromptSidebar({
                   onClick={() => onSelectSnapshot(snapshot.id)}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="flex-1 truncate text-xs text-foreground">
-                      {truncate(snapshot.prompt_text, 50)}
+                    <span className="min-w-0 flex-1 truncate text-xs text-foreground">
+                      {snapshot.prompt_text}
                     </span>
                     {isLast && isProcessing ? (
                       <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />

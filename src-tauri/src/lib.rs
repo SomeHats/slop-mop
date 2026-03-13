@@ -7,7 +7,12 @@ mod project;
 mod snapshot;
 mod window;
 
+use std::sync::Mutex;
 use tauri::Manager;
+
+/// Tracks the label of the last window that was destroyed, so the run-loop
+/// can decide whether to quit or reopen the picker.
+struct LastDestroyedLabel(Mutex<String>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,6 +28,7 @@ pub fn run() {
             let database = db::Db::open(&db_path).expect("failed to open database");
             app.manage(database);
             app.manage(agent::AgentManager::new());
+            app.manage(LastDestroyedLabel(Mutex::new(String::new())));
 
             let handle = app.handle();
             let m = menu::build_menu(handle).expect("failed to build menu");
@@ -49,6 +55,11 @@ pub fn run() {
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
+                if let Some(state) = window.try_state::<LastDestroyedLabel>() {
+                    if let Ok(mut label) = state.0.lock() {
+                        *label = window.label().to_string();
+                    }
+                }
                 // Kill agents owned by this window
                 if let Some(manager) = window.try_state::<agent::AgentManager>() {
                     manager.kill_all();
@@ -59,15 +70,24 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                // Prevent auto-exit when last window closes — we manage that ourselves
-                // by reopening the picker in on_window_event
-                api.prevent_exit();
-
-                // If no windows remain, reopen the picker
                 if app.webview_windows().is_empty() {
+                    let was_picker = app
+                        .try_state::<LastDestroyedLabel>()
+                        .and_then(|s| s.0.lock().ok().map(|l| l.as_str() == "picker"))
+                        .unwrap_or(false);
+
+                    if was_picker {
+                        // Picker was the last window closed — let the app quit
+                        return;
+                    }
+
+                    // A project window was the last to close — reopen the picker
+                    api.prevent_exit();
                     if let Err(e) = window::open_picker_window(app) {
                         eprintln!("Failed to reopen picker: {e}");
                     }
+                } else {
+                    api.prevent_exit();
                 }
             }
         });
