@@ -41,8 +41,8 @@ export function PromptSidebar({
       {snapshots.length === 0 ? (
         <p className="px-3 text-xs text-muted-foreground">No prompts yet.</p>
       ) : (
-        <ScrollArea className="flex-1">
-          <div className="flex flex-col">
+        <ScrollArea className="flex-1 [&>[data-slot=scroll-area-viewport]>div]:!block">
+          <div className="flex w-full flex-col overflow-hidden">
             {snapshots.map((snapshot, index) => {
               const isSelected = snapshot.id === selectedSnapshotId
               const isLast = index === snapshots.length - 1
@@ -53,12 +53,12 @@ export function PromptSidebar({
                   key={snapshot.id}
                   type="button"
                   className={cn(
-                    "group flex flex-col gap-1 border-b border-border px-3 py-2 text-left transition-colors hover:bg-accent",
+                    "group flex w-full flex-col gap-1 overflow-hidden border-b border-border px-3 py-2 text-left transition-colors hover:bg-accent",
                     isSelected && "bg-accent",
                   )}
                   onClick={() => onSelectSnapshot(snapshot.id)}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full min-w-0 items-center gap-2 overflow-hidden">
                     <span className="min-w-0 flex-1 truncate text-xs text-foreground">
                       {snapshot.prompt_text}
                     </span>

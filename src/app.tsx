@@ -116,6 +116,7 @@ export function App(): React.JSX.Element {
             </div>
             <PromptOutputDialog
               snapshot={viewingOutputSnapshot}
+              snapshots={snapshots}
               timeline={session.timeline}
               isProcessing={isProcessing}
               open={viewingOutput !== null}

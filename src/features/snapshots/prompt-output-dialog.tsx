@@ -14,6 +14,7 @@ import { TimelineEntryRow } from "../agents/timeline-entry"
 
 type PromptOutputDialogProps = {
   snapshot: PromptSnapshot | null
+  snapshots: PromptSnapshot[]
   timeline: TimelineEntry[]
   isProcessing: boolean
   open: boolean
@@ -21,17 +22,39 @@ type PromptOutputDialogProps = {
   autoCommitAnchorId: string | null
 }
 
-function sliceTimelineForSnapshot(timeline: TimelineEntry[], messageId: string): TimelineEntry[] {
-  // Find the user_message with the matching message_id
-  const startIndex = timeline.findIndex(
-    (entry) => entry.kind === "user_message" && entry.id === messageId,
-  )
-  if (startIndex === -1) return []
-
-  // Find the next user_message after the start
+function sliceFromIndex(timeline: TimelineEntry[], startIndex: number): TimelineEntry[] {
   const endIndex = timeline.findIndex((entry, i) => i > startIndex && entry.kind === "user_message")
-
   return endIndex === -1 ? timeline.slice(startIndex) : timeline.slice(startIndex, endIndex)
+}
+
+function sliceTimelineForSnapshot(
+  timeline: TimelineEntry[],
+  snapshot: PromptSnapshot,
+  allSnapshots: PromptSnapshot[],
+): TimelineEntry[] {
+  // Try exact ID match first (works for current-session prompts)
+  const idIndex = timeline.findIndex(
+    (entry) => entry.kind === "user_message" && entry.id === snapshot.message_id,
+  )
+  if (idIndex !== -1) return sliceFromIndex(timeline, idIndex)
+
+  // Fallback: match by content for restored sessions where IDs differ.
+  // Find which ordinal occurrence of this prompt text this snapshot is
+  // (handles duplicate prompt texts).
+  const ordinal = allSnapshots
+    .filter((s) => s.prompt_text === snapshot.prompt_text)
+    .indexOf(snapshot)
+
+  let seen = 0
+  for (let i = 0; i < timeline.length; i++) {
+    const entry = timeline[i]
+    if (entry?.kind === "user_message" && entry.content === snapshot.prompt_text) {
+      if (seen === ordinal) return sliceFromIndex(timeline, i)
+      seen++
+    }
+  }
+
+  return []
 }
 
 function sliceTimelineForAutoCommit(timeline: TimelineEntry[], anchorId: string): TimelineEntry[] {
@@ -47,6 +70,7 @@ function sliceTimelineForAutoCommit(timeline: TimelineEntry[], anchorId: string)
 
 export function PromptOutputDialog({
   snapshot,
+  snapshots,
   timeline,
   isProcessing,
   open,
@@ -60,8 +84,8 @@ export function PromptOutputDialog({
       return sliceTimelineForAutoCommit(timeline, autoCommitAnchorId)
     }
     if (!snapshot) return []
-    return sliceTimelineForSnapshot(timeline, snapshot.message_id)
-  }, [snapshot, timeline, isAutoCommitMode, autoCommitAnchorId])
+    return sliceTimelineForSnapshot(timeline, snapshot, snapshots)
+  }, [snapshot, snapshots, timeline, isAutoCommitMode, autoCommitAnchorId])
 
   const segments = useMemo(() => groupTimeline(slicedTimeline), [slicedTimeline])
 
