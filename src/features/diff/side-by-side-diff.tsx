@@ -153,8 +153,9 @@ export function SideBySideDiff({ file }: { file: FileDiff }): React.JSX.Element 
                 <div
                   key={i.toString()}
                   className={cn(
-                    "h-5 select-none pr-2 text-right text-foreground/30",
+                    "h-5 select-none px-2 text-right",
                     codeCellBg(row.left),
+                    gutterText(row.left),
                   )}
                 >
                   {row.left?.lineNo ?? ""}
@@ -198,8 +199,9 @@ export function SideBySideDiff({ file }: { file: FileDiff }): React.JSX.Element 
                 <div
                   key={i.toString()}
                   className={cn(
-                    "h-5 select-none pr-2 text-right text-foreground/30",
+                    "h-5 select-none px-2 text-right",
                     codeCellBg(row.right),
+                    gutterText(row.right),
                   )}
                 >
                   {row.right?.lineNo ?? ""}
@@ -245,10 +247,7 @@ export function SideBySideDiff({ file }: { file: FileDiff }): React.JSX.Element 
             }}
           >
             <div className="flex h-5 items-center">
-              <div
-                className="flex shrink-0 items-center justify-center gap-1"
-                style={{ width: gutterWidth }}
-              >
+              <div className="flex shrink-0 items-center gap-1 pl-2">
                 <button
                   type="button"
                   className="text-muted-foreground hover:text-foreground"
@@ -264,7 +263,7 @@ export function SideBySideDiff({ file }: { file: FileDiff }): React.JSX.Element 
                   <ChevronUp className="size-3" />
                 </button>
               </div>
-              <span className="text-[10px] text-muted-foreground">{bar.count} lines</span>
+              <span className="pl-2 text-[10px] text-muted-foreground">{bar.count} lines</span>
             </div>
             {bar.stickyLines.map((sl) => (
               <button
@@ -274,7 +273,7 @@ export function SideBySideDiff({ file }: { file: FileDiff }): React.JSX.Element 
                 onClick={() => handleRevealThrough(bar.regionIndex, sl.offsetFromTop, bar.count)}
               >
                 <span
-                  className="shrink-0 select-none pr-2 text-right text-foreground/30"
+                  className="shrink-0 select-none px-2 text-right text-foreground/30"
                   style={{ minWidth: gutterWidth }}
                 >
                   {sl.lineNo}
@@ -315,10 +314,22 @@ function codeCellBg(line: HighlightedLineData | null): string {
   if (!line) return ""
   switch (line.type) {
     case "deletion":
-      return "bg-red-950/40"
+      return "bg-red-900/40"
     case "addition":
-      return "bg-green-950/40"
+      return "bg-green-900/40"
     default:
       return ""
+  }
+}
+
+function gutterText(line: HighlightedLineData | null): string {
+  if (!line) return "text-foreground/30"
+  switch (line.type) {
+    case "deletion":
+      return "font-medium text-red-400/55"
+    case "addition":
+      return "font-medium text-green-400/55"
+    default:
+      return "text-foreground/30"
   }
 }
