@@ -145,6 +145,42 @@ export function computeStickyLines(
 }
 
 /**
+ * Determines how many context lines to show at the bottom of a collapsed region.
+ * Walks the candidate lines looking for indentation decreases, which signal scope
+ * boundaries (e.g. a closing brace). When found, the visible context starts after
+ * the last such boundary so that unrelated scope lines stay hidden.
+ */
+function computeSmartBottom(
+  rows: SideBySideRow[],
+  runStart: number,
+  runEnd: number,
+  maxLines: number,
+): number {
+  const candidateStart = runEnd - maxLines
+  // Scan a few extra lines before the candidate range to seed the indent tracker
+  const scanStart = Math.max(runStart, candidateStart - 3)
+  let prevIndent = -1
+  let lastBoundaryIdx = -1
+
+  for (let i = scanStart; i < runEnd; i++) {
+    const row = rows[i]
+    if (row?.kind !== "paired") continue
+    const line = row.left ?? row.right
+    if (!line) continue
+    if (line.content.trim() === "") continue
+
+    const indent = measureIndent(line.content)
+    if (i >= candidateStart && prevIndent >= 0 && indent < prevIndent) {
+      lastBoundaryIdx = i
+    }
+    prevIndent = indent
+  }
+
+  if (lastBoundaryIdx < 0) return maxLines
+  return Math.max(1, runEnd - lastBoundaryIdx - 1)
+}
+
+/**
  * Collapses long runs of consecutive context rows.
  * Each region tracks how many extra lines are revealed from the top and bottom
  * via the expansions map. Chevron clicks increment these values by EXPAND_STEP.
@@ -211,7 +247,7 @@ export function collapseRows(
 
     // Base visible lines at each boundary
     const baseTop = isAtStart ? 0 : CONTEXT_LINES
-    const baseBottom = isAtEnd ? 0 : CONTEXT_LINES
+    const baseBottom = isAtEnd ? 0 : computeSmartBottom(rows, run.start, runEnd, CONTEXT_LINES)
 
     const showTop = baseTop + revealedTop
     const showBottom = baseBottom + revealedBottom
