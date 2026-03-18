@@ -81,7 +81,7 @@ export function DiffPanel({
         </div>
       ) : (
         <ScrollArea className="flex-1 overflow-hidden [&>[data-slot=scroll-area-viewport]>div]:!block">
-          <div className="flex flex-col gap-4 p-4">
+          <div className="flex flex-col gap-3 p-3">
             {fileDiffs.map((file) => (
               <SideBySideDiff key={file.path} file={file} />
             ))}

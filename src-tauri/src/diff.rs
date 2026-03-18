@@ -204,8 +204,10 @@ pub fn get_repo_diff(project_path: String, commit_hash: String) -> Result<Vec<Fi
             let origin = line.origin();
             if matches!(origin, '+' | '-' | ' ') {
                 if let Some(current_hunk) = file_entry.hunks.last_mut() {
-                    let content =
-                        std::str::from_utf8(line.content()).unwrap_or("").to_string();
+                    let content = std::str::from_utf8(line.content())
+                        .unwrap_or("")
+                        .trim_end_matches(['\n', '\r'])
+                        .to_string();
                     current_hunk.lines.push(HunkLine {
                         origin,
                         content,
