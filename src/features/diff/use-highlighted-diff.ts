@@ -2,15 +2,30 @@ import { useEffect, useMemo, useState } from "react"
 import { langFromPath } from "@/lib/lang"
 import { highlightTokens, type ThemedToken } from "@/lib/shiki"
 import type { FileDiff } from "@/lib/types"
-import { collapseRows, computeRows, type LineData, type RegionExpansion } from "./compute-diff-rows"
+import {
+  collapseRows,
+  computeRows,
+  type LineData,
+  type RegionExpansion,
+  type StickyContextLine,
+} from "./compute-diff-rows"
 
 export type HighlightedLineData = LineData & {
   tokens: ThemedToken[] | null
 }
 
+export type HighlightedStickyLine = StickyContextLine & {
+  tokens: ThemedToken[] | null
+}
+
 export type HighlightedRow =
   | { kind: "paired"; left: HighlightedLineData | null; right: HighlightedLineData | null }
-  | { kind: "collapsed"; count: number; regionIndex: number }
+  | {
+      kind: "collapsed"
+      count: number
+      regionIndex: number
+      stickyLines: HighlightedStickyLine[]
+    }
 
 export function useHighlightedDiff(
   fileDiff: FileDiff,
@@ -88,17 +103,22 @@ export function useHighlightedDiff(
   // Map tokens back to visible rows
   const highlightedRows: HighlightedRow[] = useMemo(() => {
     return visibleRows.map((row): HighlightedRow => {
-      if (row.kind === "collapsed") return row
+      if (row.kind === "collapsed") {
+        return {
+          ...row,
+          stickyLines: row.stickyLines.map((sl) => ({
+            ...sl,
+            tokens: oldTokens?.get(sl.lineNo) ?? newTokens?.get(sl.lineNo) ?? null,
+          })),
+        }
+      }
 
       return {
         kind: "paired",
         left: row.left
           ? {
               ...row.left,
-              tokens:
-                row.left.type === "context"
-                  ? (newTokens?.get(row.left.lineNo) ?? oldTokens?.get(row.left.lineNo) ?? null)
-                  : (oldTokens?.get(row.left.lineNo) ?? null),
+              tokens: oldTokens?.get(row.left.lineNo) ?? null,
             }
           : null,
         right: row.right

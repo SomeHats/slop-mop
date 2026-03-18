@@ -6,9 +6,16 @@ export type LineData = {
   type: "context" | "addition" | "deletion"
 }
 
+export type StickyContextLine = {
+  content: string
+  lineNo: number
+  /** Offset from the start of the hidden region (0-based) */
+  offsetFromTop: number
+}
+
 export type SideBySideRow =
   | { kind: "paired"; left: LineData | null; right: LineData | null }
-  | { kind: "collapsed"; count: number; regionIndex: number }
+  | { kind: "collapsed"; count: number; regionIndex: number; stickyLines: StickyContextLine[] }
 
 export type RegionExpansion = {
   top: number
@@ -82,6 +89,59 @@ function pushSlice(
     const row = source[i]
     if (row) result.push(row)
   }
+}
+
+function measureIndent(line: string): number {
+  let indent = 0
+  for (const ch of line) {
+    if (ch === " ") indent++
+    else if (ch === "\t") indent += 4
+    else break
+  }
+  return indent
+}
+
+/**
+ * Detects enclosing scope openers within a range of hidden context rows.
+ * Uses indentation as a heuristic: lines whose indent level increases and
+ * persists to the end of the hidden range are scope openers.
+ */
+export function computeStickyLines(
+  rows: SideBySideRow[],
+  startIndex: number,
+  endIndex: number,
+): StickyContextLine[] {
+  const stack: { indent: number; content: string; lineNo: number; offset: number }[] = []
+
+  for (let i = startIndex; i < endIndex; i++) {
+    const row = rows[i]
+    if (row?.kind !== "paired") continue
+    const line = row.left ?? row.right
+    if (!line) continue
+    if (line.content.trim() === "") continue
+
+    const indent = measureIndent(line.content)
+
+    // Pop entries at >= current indent (their scope closed within the hidden area)
+    while (stack.length > 0 && (stack[stack.length - 1]?.indent ?? -1) >= indent) {
+      stack.pop()
+    }
+
+    stack.push({
+      indent,
+      content: line.content,
+      lineNo: line.lineNo,
+      offset: i - startIndex,
+    })
+  }
+
+  // The last entry is the innermost line at the bottom of the hidden region,
+  // not an enclosing scope opener — drop it.
+  return stack.slice(0, -1).map((entry) => ({
+    content: entry.content,
+    lineNo: entry.lineNo,
+    offsetFromTop: entry.offset,
+  }))
 }
 
 /**
@@ -168,7 +228,10 @@ export function collapseRows(
         pushSlice(result, rows, run.start, run.start + showTop)
       }
       // Collapsed marker
-      result.push({ kind: "collapsed", count: remaining, regionIndex })
+      const hiddenStart = run.start + showTop
+      const hiddenEnd = runEnd - showBottom
+      const stickyLines = computeStickyLines(rows, hiddenStart, hiddenEnd)
+      result.push({ kind: "collapsed", count: remaining, regionIndex, stickyLines })
       // Bottom visible lines
       if (showBottom > 0) {
         pushSlice(result, rows, runEnd - showBottom, runEnd)
