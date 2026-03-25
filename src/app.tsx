@@ -60,8 +60,8 @@ export function App(): React.JSX.Element {
   )
 
   const handleSendPrompt = useCallback(
-    (text: string) => {
-      void session.sendPrompt(text)
+    (text: string, modeId?: string) => {
+      void session.sendPrompt(text, modeId)
     },
     [session.sendPrompt],
   )
@@ -112,6 +112,12 @@ export function App(): React.JSX.Element {
                 onSendPrompt={handleSendPrompt}
                 isProcessing={isProcessing}
                 timeline={session.timeline}
+                availableModes={session.availableModes}
+                currentModeId={session.currentModeId}
+                pendingPlanContent={session.pendingPlanContent}
+                onApprovePlan={session.approvePlan}
+                onRejectPlan={session.rejectPlan}
+                onCancelPlan={session.cancelPlan}
               />
             </div>
             <PromptOutputDialog

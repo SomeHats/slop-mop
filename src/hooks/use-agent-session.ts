@@ -7,6 +7,7 @@ import {
   PROTOCOL_VERSION,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
+  type SessionMode,
   type SessionNotification,
   type ToolCallContent,
 } from "@agentclientprotocol/sdk"
@@ -30,6 +31,9 @@ type AgentSessionState = {
   previousSessions: PreviousSession[]
   error: string | null
   autoCommitPhase: AutoCommitPhase | null
+  availableModes: SessionMode[]
+  currentModeId: string | null
+  pendingPlanContent: string | null
 }
 
 export type AgentSession = AgentSessionState & {
@@ -37,7 +41,10 @@ export type AgentSession = AgentSessionState & {
   newSession: () => Promise<void>
   resumeSession: (sessionId: string) => Promise<void>
   stopSession: () => Promise<void>
-  sendPrompt: (text: string) => Promise<void>
+  sendPrompt: (text: string, modeId?: string) => Promise<void>
+  approvePlan: () => void
+  rejectPlan: () => void
+  cancelPlan: () => void
 }
 
 let nextMessageId = 0
@@ -62,6 +69,9 @@ const INITIAL_STATE: AgentSessionState = {
   previousSessions: [],
   error: null,
   autoCommitPhase: null,
+  availableModes: [],
+  currentModeId: null,
+  pendingPlanContent: null,
 }
 
 export function useAgentSession(): AgentSession {
@@ -74,6 +84,9 @@ export function useAgentSession(): AgentSession {
   const projectPathRef = useRef<string | null>(null)
   const projectIdRef = useRef<string | null>(null)
   const capabilitiesRef = useRef<AgentCapabilities | null>(null)
+  const planPermissionResolverRef = useRef<((response: RequestPermissionResponse) => void) | null>(
+    null,
+  )
 
   const handleSessionUpdate = useCallback((params: SessionNotification): void => {
     const update = params.update
@@ -181,27 +194,67 @@ export function useAgentSession(): AgentSession {
         }))
         break
       }
+      case "current_mode_update": {
+        setState((prev) => ({
+          ...prev,
+          currentModeId: update.currentModeId,
+        }))
+        break
+      }
       default:
         break
     }
   }, [])
+
+  const handlePermissionRequest = useCallback(
+    (params: RequestPermissionRequest): Promise<RequestPermissionResponse> => {
+      // Detect plan approval: agent wants to switch out of plan mode
+      if (params.toolCall.kind === "switch_mode") {
+        const rawInput = params.toolCall.rawInput as { plan?: unknown } | undefined
+        const planText =
+          rawInput != null && typeof rawInput.plan === "string" ? rawInput.plan : null
+
+        if (planText) {
+          return new Promise<RequestPermissionResponse>((resolve) => {
+            planPermissionResolverRef.current = resolve
+            setState((prev) => ({ ...prev, pendingPlanContent: planText }))
+          })
+        }
+      }
+
+      // Auto-approve all other permission requests
+      const allowOption = params.options.find((o) => o.kind === "allow_once")
+      const firstOption = params.options[0]
+      const option = allowOption ?? firstOption
+      if (!option) {
+        return Promise.resolve({ outcome: { outcome: "cancelled" } })
+      }
+      return Promise.resolve({
+        outcome: { outcome: "selected", optionId: option.optionId },
+      })
+    },
+    [],
+  )
 
   const createNewSession = useCallback(async (): Promise<void> => {
     const connection = connectionRef.current
     const cwd = projectPathRef.current
     if (!connection || !cwd) return
 
-    const { sessionId } = await connection.newSession({
+    const response = await connection.newSession({
       cwd,
       mcpServers: [],
     })
-    sessionIdRef.current = sessionId
+    sessionIdRef.current = response.sessionId
 
     setState((prev) => ({
       ...prev,
       isProcessing: false,
       hasActiveSession: true,
       previousSessions: [],
+      availableModes: response.modes?.availableModes ?? [],
+      currentModeId: response.modes?.currentModeId ?? null,
+      pendingPlanContent: null,
     }))
   }, [])
 
@@ -223,19 +276,7 @@ export function useAgentSession(): AgentSession {
             async sessionUpdate(params: SessionNotification): Promise<void> {
               handleSessionUpdate(params)
             },
-            async requestPermission(
-              params: RequestPermissionRequest,
-            ): Promise<RequestPermissionResponse> {
-              const allowOption = params.options.find((o) => o.kind === "allow_once")
-              const firstOption = params.options[0]
-              const option = allowOption ?? firstOption
-              if (!option) {
-                return { outcome: { outcome: "cancelled" } }
-              }
-              return {
-                outcome: { outcome: "selected", optionId: option.optionId },
-              }
-            },
+            requestPermission: handlePermissionRequest,
           }),
           stream,
         )
@@ -287,7 +328,7 @@ export function useAgentSession(): AgentSession {
         }))
       }
     },
-    [handleSessionUpdate, createNewSession],
+    [handleSessionUpdate, handlePermissionRequest, createNewSession],
   )
 
   const newSession = useCallback(async (): Promise<void> => {
@@ -317,7 +358,7 @@ export function useAgentSession(): AgentSession {
     }))
 
     try {
-      await connection.loadSession({
+      const response = await connection.loadSession({
         sessionId,
         cwd,
         mcpServers: [],
@@ -337,6 +378,9 @@ export function useAgentSession(): AgentSession {
         isProcessing: false,
         hasActiveSession: true,
         previousSessions: [],
+        availableModes: response.modes?.availableModes ?? [],
+        currentModeId: response.modes?.currentModeId ?? null,
+        pendingPlanContent: null,
       }))
     } catch (e) {
       setState((prev) => ({
@@ -347,14 +391,14 @@ export function useAgentSession(): AgentSession {
     }
   }, [])
 
-  const sendPrompt = useCallback(async (text: string): Promise<void> => {
+  const sendPrompt = useCallback(async (text: string, modeId?: string): Promise<void> => {
     const connection = connectionRef.current
     const sessionId = sessionIdRef.current
     const projectId = projectIdRef.current
     const projectPath = projectPathRef.current
     if (!connection || !sessionId) return
 
-    setState((prev) => ({ ...prev, isProcessing: true, error: null }))
+    setState((prev) => ({ ...prev, isProcessing: true, error: null, pendingPlanContent: null }))
 
     try {
       // Ensure worktree is clean so the snapshot commit hash is accurate
@@ -426,6 +470,12 @@ export function useAgentSession(): AgentSession {
         )
       }
 
+      // Switch mode if requested and different from current
+      if (modeId != null) {
+        await connection.setSessionMode({ sessionId, modeId })
+        setState((prev) => ({ ...prev, currentModeId: modeId }))
+      }
+
       await connection.prompt({
         sessionId,
         messageId,
@@ -451,6 +501,7 @@ export function useAgentSession(): AgentSession {
     projectPathRef.current = null
     projectIdRef.current = null
     capabilitiesRef.current = null
+    planPermissionResolverRef.current = null
 
     if (agentId) {
       try {
@@ -463,6 +514,30 @@ export function useAgentSession(): AgentSession {
     setState(INITIAL_STATE)
   }, [])
 
+  const approvePlan = useCallback((): void => {
+    const resolve = planPermissionResolverRef.current
+    if (!resolve) return
+    planPermissionResolverRef.current = null
+    resolve({ outcome: { outcome: "selected", optionId: "default" } })
+    setState((prev) => ({ ...prev, pendingPlanContent: null }))
+  }, [])
+
+  const rejectPlan = useCallback((): void => {
+    const resolve = planPermissionResolverRef.current
+    if (!resolve) return
+    planPermissionResolverRef.current = null
+    resolve({ outcome: { outcome: "selected", optionId: "plan" } })
+    setState((prev) => ({ ...prev, pendingPlanContent: null }))
+  }, [])
+
+  const cancelPlan = useCallback((): void => {
+    const resolve = planPermissionResolverRef.current
+    if (!resolve) return
+    planPermissionResolverRef.current = null
+    resolve({ outcome: { outcome: "cancelled" } })
+    setState((prev) => ({ ...prev, pendingPlanContent: null }))
+  }, [])
+
   return {
     ...state,
     connect,
@@ -470,5 +545,8 @@ export function useAgentSession(): AgentSession {
     resumeSession,
     stopSession,
     sendPrompt,
+    approvePlan,
+    rejectPlan,
+    cancelPlan,
   }
 }

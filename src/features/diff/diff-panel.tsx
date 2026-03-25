@@ -4,13 +4,22 @@ import {
   type FormEvent,
   type KeyboardEvent,
   useCallback,
+  useEffect,
   useRef,
   useState,
 } from "react"
+import { Markdown } from "@/components/markdown"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import type { FileDiff, PromptSnapshot, TimelineEntry } from "@/lib/types"
+import type { FileDiff, PromptSnapshot, SessionMode, TimelineEntry } from "@/lib/types"
 import { ExecutionPreview } from "../agents/execution-preview"
 import { SideBySideDiff } from "./side-by-side-diff"
 
@@ -18,9 +27,48 @@ type DiffPanelProps = {
   fileDiffs: FileDiff[]
   isLoading: boolean
   selectedSnapshot: PromptSnapshot | null
-  onSendPrompt: (text: string) => void
+  onSendPrompt: (text: string, modeId?: string) => void
   isProcessing: boolean
   timeline: TimelineEntry[]
+  availableModes: SessionMode[]
+  currentModeId: string | null
+  pendingPlanContent: string | null
+  onApprovePlan: () => void
+  onRejectPlan: () => void
+  onCancelPlan: () => void
+}
+
+function PlanDisplay({
+  content,
+  actions,
+}: {
+  content: string
+  actions?: {
+    onApprove: () => void
+    onEdit: () => void
+    onCancel: () => void
+  }
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-3 border-t border-border bg-muted/30 p-3">
+      <ScrollArea className="max-h-80">
+        <Markdown content={content} />
+      </ScrollArea>
+      {actions ? (
+        <div className="flex gap-2">
+          <Button size="sm" onClick={actions.onApprove}>
+            Approve
+          </Button>
+          <Button size="sm" variant="secondary" onClick={actions.onEdit}>
+            Edit
+          </Button>
+          <Button size="sm" variant="outline" onClick={actions.onCancel}>
+            Cancel
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 export function DiffPanel({
@@ -30,9 +78,24 @@ export function DiffPanel({
   onSendPrompt,
   isProcessing,
   timeline,
+  availableModes,
+  currentModeId,
+  pendingPlanContent,
+  onApprovePlan,
+  onRejectPlan,
+  onCancelPlan,
 }: DiffPanelProps): React.JSX.Element {
   const [input, setInput] = useState("")
+  const [selectedModeId, setSelectedModeId] = useState(currentModeId ?? "")
+  const [editingPlanContent, setEditingPlanContent] = useState<string | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Sync local selection when the agent changes the mode (e.g. autonomously)
+  useEffect(() => {
+    setSelectedModeId(currentModeId ?? "")
+  }, [currentModeId])
+
+  const hasModes = availableModes.length > 1
 
   const resizeTextarea = useCallback((): void => {
     const el = textareaRef.current
@@ -54,8 +117,12 @@ export function DiffPanel({
     const text = input.trim()
     if (!text || isProcessing) return
     setInput("")
+    setEditingPlanContent(null)
     resizeTextarea()
-    onSendPrompt(text)
+    // Only pass modeId if it differs from the current server-side mode
+    const modeId =
+      selectedModeId !== "" && selectedModeId !== currentModeId ? selectedModeId : undefined
+    onSendPrompt(text, modeId)
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
@@ -63,6 +130,14 @@ export function DiffPanel({
       e.preventDefault()
       handleSubmit(e)
     }
+  }
+
+  const handleEdit = (): void => {
+    if (pendingPlanContent) {
+      setEditingPlanContent(pendingPlanContent)
+    }
+    onRejectPlan()
+    textareaRef.current?.focus()
   }
 
   return (
@@ -90,8 +165,21 @@ export function DiffPanel({
       )}
 
       <Separator />
-      <ExecutionPreview timeline={timeline} isProcessing={isProcessing} />
-      <form onSubmit={handleSubmit} className="flex items-end gap-2 p-3">
+      {pendingPlanContent ? (
+        <PlanDisplay
+          content={pendingPlanContent}
+          actions={{
+            onApprove: onApprovePlan,
+            onEdit: handleEdit,
+            onCancel: onCancelPlan,
+          }}
+        />
+      ) : editingPlanContent ? (
+        <PlanDisplay content={editingPlanContent} />
+      ) : (
+        <ExecutionPreview timeline={timeline} isProcessing={isProcessing} />
+      )}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2 p-3">
         <textarea
           ref={textareaRef}
           value={input}
@@ -100,11 +188,33 @@ export function DiffPanel({
           placeholder="Send a message..."
           disabled={isProcessing}
           rows={1}
-          className="field-sizing-content max-h-40 min-h-9 flex-1 resize-none border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          className="field-sizing-content max-h-40 min-h-9 w-full resize-none border border-input bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         />
-        <Button type="submit" disabled={isProcessing || !input.trim()}>
-          Send
-        </Button>
+        <div className="flex items-center justify-between">
+          {hasModes ? (
+            <Select
+              value={selectedModeId}
+              onValueChange={setSelectedModeId}
+              disabled={isProcessing}
+            >
+              <SelectTrigger size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableModes.map((mode) => (
+                  <SelectItem key={mode.id} value={mode.id}>
+                    {mode.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <span />
+          )}
+          <Button type="submit" disabled={isProcessing || !input.trim()}>
+            Send
+          </Button>
+        </div>
       </form>
     </div>
   )

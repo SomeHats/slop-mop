@@ -1,4 +1,11 @@
-import type { ToolCallContent, ToolCallStatus, ToolKind } from "@agentclientprotocol/sdk"
+import type {
+  SessionMode,
+  ToolCallContent,
+  ToolCallStatus,
+  ToolKind,
+} from "@agentclientprotocol/sdk"
+
+export type { SessionMode }
 
 export type Project = {
   id: string
