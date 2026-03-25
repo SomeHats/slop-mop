@@ -5,7 +5,7 @@ use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{Mutex, OnceLock};
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 
 use crate::error::Error;
 
@@ -94,6 +94,7 @@ fn resolve_agent_launch(app: &AppHandle) -> AgentLaunch {
 }
 
 pub struct AgentProcess {
+    window_label: String,
     stdin: Mutex<ChildStdin>,
     child: Mutex<Child>,
 }
@@ -103,6 +104,25 @@ pub struct AgentManager(pub Mutex<HashMap<String, AgentProcess>>);
 impl AgentManager {
     pub fn new() -> Self {
         Self(Mutex::new(HashMap::new()))
+    }
+
+    pub fn kill_for_window(&self, label: &str) {
+        let mut agents = match self.0.lock() {
+            Ok(a) => a,
+            Err(_) => return,
+        };
+        let ids: Vec<String> = agents
+            .iter()
+            .filter(|(_, a)| a.window_label == label)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for id in ids {
+            if let Some(agent) = agents.remove(&id) {
+                if let Ok(mut child) = agent.child.into_inner() {
+                    let _ = child.kill();
+                }
+            }
+        }
     }
 
     pub fn kill_all(&self) {
@@ -131,10 +151,15 @@ struct AgentExitEvent {
 
 #[tauri::command]
 pub fn spawn_agent(
+    window: WebviewWindow,
     app: AppHandle,
     manager: State<'_, AgentManager>,
     project_path: String,
 ) -> Result<String, Error> {
+    // Kill any existing agents for this window — handles frontend reloads
+    // where the old process would otherwise be orphaned.
+    manager.kill_for_window(window.label());
+
     let launch = resolve_agent_launch(&app);
     let (display_name, mut cmd) = match &launch {
         AgentLaunch::Bundled { node, script } => {
@@ -202,6 +227,7 @@ pub fn spawn_agent(
     });
 
     let process = AgentProcess {
+        window_label: window.label().to_string(),
         stdin: Mutex::new(stdin),
         child: Mutex::new(child),
     };

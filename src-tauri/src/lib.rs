@@ -5,6 +5,7 @@ mod error;
 mod menu;
 mod project;
 mod snapshot;
+mod watcher;
 mod window;
 
 use std::sync::Mutex;
@@ -28,6 +29,7 @@ pub fn run() {
             let database = db::Db::open(&db_path).expect("failed to open database");
             app.manage(database);
             app.manage(agent::AgentManager::new());
+            app.manage(watcher::WatcherManager::new());
             app.manage(LastDestroyedLabel(Mutex::new(String::new())));
 
             let handle = app.handle();
@@ -52,6 +54,8 @@ pub fn run() {
             window::open_project_window,
             diff::batch_diff_stats,
             diff::get_repo_diff,
+            watcher::start_watching,
+            watcher::stop_watching,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
@@ -60,9 +64,12 @@ pub fn run() {
                         *label = window.label().to_string();
                     }
                 }
-                // Kill agents owned by this window
+                // Kill agents and stop watcher owned by this window
                 if let Some(manager) = window.try_state::<agent::AgentManager>() {
-                    manager.kill_all();
+                    manager.kill_for_window(window.label());
+                }
+                if let Some(w) = window.try_state::<watcher::WatcherManager>() {
+                    w.stop_for_window(window.label());
                 }
             }
         })

@@ -63,3 +63,11 @@ export function batchDiffStats(
 export function getRepoDiff(projectPath: string, commitHash: string): Promise<FileDiff[]> {
   return invoke<FileDiff[]>("get_repo_diff", { projectPath, commitHash })
 }
+
+export function startWatching(projectPath: string): Promise<void> {
+  return invoke("start_watching", { projectPath })
+}
+
+export function stopWatching(): Promise<void> {
+  return invoke("stop_watching")
+}

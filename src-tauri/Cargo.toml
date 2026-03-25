@@ -19,3 +19,5 @@ git2 = "0.20"
 thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
 rusqlite = { version = "0.35", features = ["bundled"] }
+notify = "7"
+notify-debouncer-mini = "0.5"

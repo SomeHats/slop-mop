@@ -25,6 +25,9 @@ pub enum Error {
 
     #[error("Window error: {0}")]
     Window(String),
+
+    #[error("Watcher error: {0}")]
+    Watcher(String),
 }
 
 impl Serialize for Error {

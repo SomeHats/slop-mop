@@ -8,6 +8,7 @@ import { useAgentSession } from "./hooks/use-agent-session"
 import { useDiffStats } from "./hooks/use-diff-stats"
 import { useFullscreen } from "./hooks/use-fullscreen"
 import { useRepoDiff } from "./hooks/use-repo-diff"
+import { startWatching } from "./lib/tauri"
 
 const project = window.__PROJECT
 
@@ -27,10 +28,11 @@ export function App(): React.JSX.Element {
     autoCommitPhase,
   } = session
 
-  // Connect to the agent on mount
+  // Connect to the agent and start FS watcher on mount
   useEffect(() => {
     if (!project) return
     void session.connect(project.path, project.id)
+    void startWatching(project.path)
   }, [session.connect])
 
   // Auto-select latest snapshot when list grows
