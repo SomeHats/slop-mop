@@ -92,6 +92,45 @@ export function useAgentSession(): AgentSession {
     const update = params.update
 
     switch (update.sessionUpdate) {
+      case "user_message_chunk": {
+        const text = extractText(update.content)
+        if (!text) break
+
+        // Skip internal Claude Code messages (slash commands, command output)
+        if (/^<[a-z-]+>/.test(text.trimStart())) break
+
+        const messageId =
+          "messageId" in update && typeof update.messageId === "string" ? update.messageId : null
+
+        setState((prev) => {
+          const lastEntry = prev.timeline[prev.timeline.length - 1]
+          if (
+            lastEntry?.kind === "user_message" &&
+            messageId !== null &&
+            lastEntry.id === messageId
+          ) {
+            return {
+              ...prev,
+              timeline: [
+                ...prev.timeline.slice(0, -1),
+                { ...lastEntry, content: lastEntry.content + text },
+              ],
+            }
+          }
+          return {
+            ...prev,
+            timeline: [
+              ...prev.timeline,
+              {
+                kind: "user_message" as const,
+                id: messageId ?? generateMessageId(),
+                content: text,
+              },
+            ],
+          }
+        })
+        break
+      }
       case "agent_message_chunk": {
         const text = extractText(update.content)
         if (!text) break
@@ -374,6 +413,7 @@ export function useAgentSession(): AgentSession {
 
       setState((prev) => ({
         ...prev,
+        // Keep timeline entries streamed by loadSession via handleSessionUpdate
         snapshots,
         isProcessing: false,
         hasActiveSession: true,

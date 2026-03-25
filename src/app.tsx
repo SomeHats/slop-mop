@@ -1,16 +1,13 @@
 import { useCallback, useEffect, useState } from "react"
 import { Separator } from "@/components/ui/separator"
 import { SessionPicker } from "./features/agents/session-picker"
+import { ChatSidebar } from "./features/chat/chat-sidebar"
 import { DiffPanel } from "./features/diff/diff-panel"
 import { ProjectPicker } from "./features/projects/project-picker"
-import { PromptOutputDialog } from "./features/snapshots/prompt-output-dialog"
-import { PromptSidebar } from "./features/snapshots/prompt-sidebar"
 import { useAgentSession } from "./hooks/use-agent-session"
 import { useDiffStats } from "./hooks/use-diff-stats"
 import { useFullscreen } from "./hooks/use-fullscreen"
 import { useRepoDiff } from "./hooks/use-repo-diff"
-
-type ViewingOutput = { kind: "snapshot"; snapshotId: string } | { kind: "auto-commit" } | null
 
 const project = window.__PROJECT
 
@@ -19,7 +16,6 @@ export function App(): React.JSX.Element {
   const session = useAgentSession()
 
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null)
-  const [viewingOutput, setViewingOutput] = useState<ViewingOutput>(null)
 
   const {
     snapshots,
@@ -49,10 +45,6 @@ export function App(): React.JSX.Element {
   const diffStats = useDiffStats(project?.path ?? "", snapshots)
 
   const selectedSnapshot = snapshots.find((s) => s.id === selectedSnapshotId) ?? null
-  const viewingOutputSnapshot =
-    viewingOutput?.kind === "snapshot"
-      ? (snapshots.find((s) => s.id === viewingOutput.snapshotId) ?? null)
-      : null
 
   const { fileDiffs, isLoading: isDiffLoading } = useRepoDiff(
     project?.path ?? "",
@@ -94,45 +86,29 @@ export function App(): React.JSX.Element {
       <div className="flex flex-1 overflow-hidden">
         {hasActiveSession ? (
           <>
-            <PromptSidebar
+            <ChatSidebar
+              timeline={session.timeline}
               snapshots={snapshots}
               diffStats={diffStats}
               selectedSnapshotId={selectedSnapshotId}
               onSelectSnapshot={setSelectedSnapshotId}
-              onViewOutput={(id) => setViewingOutput({ kind: "snapshot", snapshotId: id })}
               isProcessing={isProcessing}
               autoCommitPhase={autoCommitPhase}
-              onViewAutoCommit={() => setViewingOutput({ kind: "auto-commit" })}
+              availableModes={session.availableModes}
+              currentModeId={session.currentModeId}
+              onSendPrompt={handleSendPrompt}
             />
             <div className="flex-1 overflow-hidden">
               <DiffPanel
                 fileDiffs={fileDiffs}
                 isLoading={isDiffLoading}
                 selectedSnapshot={selectedSnapshot}
-                onSendPrompt={handleSendPrompt}
-                isProcessing={isProcessing}
-                timeline={session.timeline}
-                availableModes={session.availableModes}
-                currentModeId={session.currentModeId}
                 pendingPlanContent={session.pendingPlanContent}
                 onApprovePlan={session.approvePlan}
                 onRejectPlan={session.rejectPlan}
                 onCancelPlan={session.cancelPlan}
               />
             </div>
-            <PromptOutputDialog
-              snapshot={viewingOutputSnapshot}
-              snapshots={snapshots}
-              timeline={session.timeline}
-              isProcessing={isProcessing}
-              open={viewingOutput !== null}
-              onClose={() => setViewingOutput(null)}
-              autoCommitAnchorId={
-                viewingOutput?.kind === "auto-commit"
-                  ? (autoCommitPhase?.timelineAnchorId ?? null)
-                  : null
-              }
-            />
           </>
         ) : isConnected ? (
           <SessionPicker
