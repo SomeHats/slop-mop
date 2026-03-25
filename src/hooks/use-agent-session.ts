@@ -241,6 +241,7 @@ export function useAgentSession(): AgentSession {
         break
       }
       default:
+        console.warn(`[agent-session] unrecognised sessionUpdate type: ${update.sessionUpdate}`)
         break
     }
   }, [])

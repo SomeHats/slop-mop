@@ -47,7 +47,10 @@ fn delta_to_status(delta: Delta) -> &'static str {
         Delta::Renamed => "renamed",
         Delta::Copied => "copied",
         Delta::Typechange => "typechange",
-        _ => "unknown",
+        other => {
+            eprintln!("[diff] unrecognised git delta variant: {:?}", other);
+            "unknown"
+        }
     }
 }
 
