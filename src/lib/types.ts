@@ -85,3 +85,28 @@ export type TimelineEntry =
 export type AutoCommitPhase =
   | { status: "running"; timelineAnchorId: string }
   | { status: "failed"; timelineAnchorId: string; error: string }
+
+export type PermissionRule = {
+  id: string
+  project_id: string | null
+  path_prefix: string
+  decision: "allow" | "deny"
+  tool_kind: "read" | "edit"
+  created_at: string
+}
+
+export type NewRule = {
+  project_id: string | null
+  path_prefix: string
+  decision: "allow" | "deny"
+  tool_kind: "read" | "edit"
+}
+
+export type PendingPermission = {
+  request: import("@agentclientprotocol/sdk").RequestPermissionRequest
+  unmatchedPaths: string[]
+  deniedPaths: string[]
+  toolKind: "read" | "edit"
+  projectId: string
+  resolve: (response: import("@agentclientprotocol/sdk").RequestPermissionResponse) => void
+}

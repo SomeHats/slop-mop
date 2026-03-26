@@ -12,6 +12,7 @@ import {
   type ToolCallContent,
 } from "@agentclientprotocol/sdk"
 import { useCallback, useRef, useState } from "react"
+import { usePermissionHandler } from "../features/permissions/use-permission-handler"
 import { createAgentStream } from "../lib/agent-stream"
 import {
   isWorktreeDirty,
@@ -20,7 +21,13 @@ import {
   recordPromptSnapshot,
   spawnAgent,
 } from "../lib/tauri"
-import type { AutoCommitPhase, PreviousSession, PromptSnapshot, TimelineEntry } from "../lib/types"
+import type {
+  AutoCommitPhase,
+  PendingPermission,
+  PreviousSession,
+  PromptSnapshot,
+  TimelineEntry,
+} from "../lib/types"
 
 type AgentSessionState = {
   timeline: TimelineEntry[]
@@ -45,6 +52,10 @@ export type AgentSession = AgentSessionState & {
   approvePlan: () => void
   rejectPlan: () => void
   cancelPlan: () => void
+  pendingPermission: PendingPermission | null
+  allowOncePermission: () => void
+  denyOncePermission: () => void
+  createPermissionRules: (rules: import("../lib/types").NewRule[]) => void
 }
 
 let nextMessageId = 0
@@ -76,6 +87,7 @@ const INITIAL_STATE: AgentSessionState = {
 
 export function useAgentSession(): AgentSession {
   const [state, setState] = useState<AgentSessionState>(INITIAL_STATE)
+  const permissionHandler = usePermissionHandler()
 
   const connectionRef = useRef<ClientSideConnection | null>(null)
   const sessionIdRef = useRef<string | null>(null)
@@ -241,7 +253,7 @@ export function useAgentSession(): AgentSession {
         break
       }
       default:
-        console.warn(`[agent-session] unrecognised sessionUpdate type: ${update.sessionUpdate}`)
+        console.warn("[agent-session] unrecognised sessionUpdate type:", update)
         break
     }
   }, [])
@@ -262,18 +274,34 @@ export function useAgentSession(): AgentSession {
         }
       }
 
+      // File access permissions: delegate read/edit with locations to permission handler
+      const kind = params.toolCall.kind
+      if (
+        (kind === "read" || kind === "edit") &&
+        params.toolCall.locations != null &&
+        params.toolCall.locations.length > 0
+      ) {
+        const projectId = projectIdRef.current
+        const workspacePath = projectPathRef.current
+        if (projectId && workspacePath) {
+          return permissionHandler.handlePermissionRequest(params, projectId, workspacePath)
+        }
+      }
+
       // Auto-approve all other permission requests
+      console.warn("[agent-session] auto-approving permission request:", params)
       const allowOption = params.options.find((o) => o.kind === "allow_once")
       const firstOption = params.options[0]
       const option = allowOption ?? firstOption
       if (!option) {
+        console.warn("[agent-session] no options available for permission request, cancelling")
         return Promise.resolve({ outcome: { outcome: "cancelled" } })
       }
       return Promise.resolve({
         outcome: { outcome: "selected", optionId: option.optionId },
       })
     },
-    [],
+    [permissionHandler.handlePermissionRequest],
   )
 
   const createNewSession = useCallback(async (): Promise<void> => {
@@ -589,5 +617,9 @@ export function useAgentSession(): AgentSession {
     approvePlan,
     rejectPlan,
     cancelPlan,
+    pendingPermission: permissionHandler.pendingPermission,
+    allowOncePermission: permissionHandler.allowOnce,
+    denyOncePermission: permissionHandler.denyOnce,
+    createPermissionRules: permissionHandler.createRulesAndContinue,
   }
 }

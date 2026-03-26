@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import type { DiffStats, FileDiff, Project, PromptSnapshot } from "./types"
+import type { DiffStats, FileDiff, NewRule, PermissionRule, Project, PromptSnapshot } from "./types"
 
 export function openProject(path: string): Promise<Project> {
   return invoke<Project>("open_project", { path })
@@ -70,4 +70,16 @@ export function startWatching(projectPath: string): Promise<void> {
 
 export function stopWatching(): Promise<void> {
   return invoke("stop_watching")
+}
+
+export function getPermissionRules(projectId: string, toolKind: string): Promise<PermissionRule[]> {
+  return invoke<PermissionRule[]>("get_permission_rules", { projectId, toolKind })
+}
+
+export function createPermissionRules(rules: NewRule[]): Promise<PermissionRule[]> {
+  return invoke<PermissionRule[]>("create_permission_rules", { rules })
+}
+
+export function deletePermissionRule(id: string): Promise<void> {
+  return invoke("delete_permission_rule", { id })
 }

@@ -3,6 +3,7 @@ mod db;
 mod diff;
 mod error;
 mod menu;
+mod permission;
 mod project;
 mod snapshot;
 mod watcher;
@@ -56,6 +57,9 @@ pub fn run() {
             diff::get_repo_diff,
             watcher::start_watching,
             watcher::stop_watching,
+            permission::get_permission_rules,
+            permission::create_permission_rules,
+            permission::delete_permission_rule,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

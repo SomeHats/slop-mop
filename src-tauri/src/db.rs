@@ -35,7 +35,17 @@ impl Db {
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
             CREATE INDEX IF NOT EXISTS idx_prompt_snapshots_session
-                ON prompt_snapshots(session_id, created_at);",
+                ON prompt_snapshots(session_id, created_at);
+            CREATE TABLE IF NOT EXISTS permission_rules (
+                id TEXT PRIMARY KEY,
+                project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+                path_prefix TEXT NOT NULL,
+                decision TEXT NOT NULL CHECK(decision IN ('allow', 'deny')),
+                tool_kind TEXT NOT NULL CHECK(tool_kind IN ('read', 'edit')),
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_permission_rules_project
+                ON permission_rules(project_id);",
         )
         .map_err(|e| Error::Database(e.to_string()))?;
         Ok(())
