@@ -12,6 +12,7 @@ import {
   type ToolCallContent,
 } from "@agentclientprotocol/sdk"
 import { useCallback, useRef, useState } from "react"
+import { useExecutePermissionHandler } from "../features/permissions/use-execute-permission-handler"
 import { usePermissionHandler } from "../features/permissions/use-permission-handler"
 import { createAgentStream } from "../lib/agent-stream"
 import {
@@ -23,6 +24,10 @@ import {
 } from "../lib/tauri"
 import type {
   AutoCommitPhase,
+  NewExecuteFileRule,
+  NewExecuteFlagRule,
+  NewExecuteRule,
+  PendingExecutePermission,
   PendingPermission,
   PreviousSession,
   PromptSnapshot,
@@ -56,6 +61,14 @@ export type AgentSession = AgentSessionState & {
   allowOncePermission: () => void
   denyOncePermission: () => void
   createPermissionRules: (rules: import("../lib/types").NewRule[]) => void
+  pendingExecutePermission: PendingExecutePermission | null
+  allowOnceExecutePermission: () => void
+  denyOnceExecutePermission: () => void
+  createExecutePermissionRules: (
+    commandRules: NewExecuteRule[],
+    flagRules: Map<number, NewExecuteFlagRule[]>,
+    fileRules: Map<number, NewExecuteFileRule[]>,
+  ) => void
 }
 
 let nextMessageId = 0
@@ -88,6 +101,7 @@ const INITIAL_STATE: AgentSessionState = {
 export function useAgentSession(): AgentSession {
   const [state, setState] = useState<AgentSessionState>(INITIAL_STATE)
   const permissionHandler = usePermissionHandler()
+  const executePermissionHandler = useExecutePermissionHandler()
 
   const connectionRef = useRef<ClientSideConnection | null>(null)
   const sessionIdRef = useRef<string | null>(null)
@@ -274,6 +288,19 @@ export function useAgentSession(): AgentSession {
         }
       }
 
+      // Execute permissions: delegate bash commands to execute permission handler
+      if (params.toolCall.kind === "execute") {
+        const projectId = projectIdRef.current
+        const workspacePath = projectPathRef.current
+        if (projectId && workspacePath) {
+          return executePermissionHandler.handleExecutePermissionRequest(
+            params,
+            projectId,
+            workspacePath,
+          )
+        }
+      }
+
       // File access permissions: delegate read/edit with locations to permission handler
       const kind = params.toolCall.kind
       if (
@@ -301,7 +328,10 @@ export function useAgentSession(): AgentSession {
         outcome: { outcome: "selected", optionId: option.optionId },
       })
     },
-    [permissionHandler.handlePermissionRequest],
+    [
+      permissionHandler.handlePermissionRequest,
+      executePermissionHandler.handleExecutePermissionRequest,
+    ],
   )
 
   const createNewSession = useCallback(async (): Promise<void> => {
@@ -621,5 +651,9 @@ export function useAgentSession(): AgentSession {
     allowOncePermission: permissionHandler.allowOnce,
     denyOncePermission: permissionHandler.denyOnce,
     createPermissionRules: permissionHandler.createRulesAndContinue,
+    pendingExecutePermission: executePermissionHandler.pendingExecutePermission,
+    allowOnceExecutePermission: executePermissionHandler.allowOnceExecutePermission,
+    denyOnceExecutePermission: executePermissionHandler.denyOnceExecutePermission,
+    createExecutePermissionRules: executePermissionHandler.createExecutePermissionRules,
   }
 }

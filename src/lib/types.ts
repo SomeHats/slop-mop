@@ -110,3 +110,82 @@ export type PendingPermission = {
   projectId: string
   resolve: (response: import("@agentclientprotocol/sdk").RequestPermissionResponse) => void
 }
+
+// --- Execute permission types ---
+
+export type ExecuteRule = {
+  id: string
+  project_id: string | null
+  command: string
+  decision: "allow" | "deny"
+  created_at: string
+}
+
+export type ExecuteFlagRule = {
+  id: string
+  execute_rule_id: string
+  flag: string
+  decision: "allow" | "deny"
+  created_at: string
+}
+
+export type ExecuteFileRule = {
+  id: string
+  execute_rule_id: string
+  path_prefix: string
+  decision: "allow" | "deny"
+  created_at: string
+}
+
+export type NewExecuteRule = {
+  project_id: string | null
+  command: string
+  decision: "allow" | "deny"
+}
+
+export type NewExecuteFlagRule = {
+  execute_rule_id: string
+  flag: string
+  decision: "allow" | "deny"
+}
+
+export type NewExecuteFileRule = {
+  execute_rule_id: string
+  path_prefix: string
+  decision: "allow" | "deny"
+}
+
+export type ParsedCommand = {
+  identity: string
+  flags: string[]
+  fileArgs: string[]
+  isDynamic: boolean
+}
+
+export type UnmatchedCommand = {
+  command: ParsedCommand
+  unmatchedFlags: string[]
+  deniedFlags: string[]
+  unmatchedFiles: string[]
+  deniedFiles: string[]
+  existingRule: ExecuteRule | null
+}
+
+export type DeniedCommand = {
+  command: ParsedCommand
+  reason: "command_denied" | "flag_denied" | "file_denied"
+  deniedFlags: string[]
+  deniedFiles: string[]
+}
+
+export type PendingExecutePermission = {
+  request: import("@agentclientprotocol/sdk").RequestPermissionRequest
+  rawCommandString: string
+  commands: ParsedCommand[]
+  unmatchedCommands: UnmatchedCommand[]
+  deniedCommands: DeniedCommand[]
+  isDynamic: boolean
+  projectId: string
+  workspacePath: string
+  resolve: (response: import("@agentclientprotocol/sdk").RequestPermissionResponse) => void
+}

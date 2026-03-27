@@ -28,12 +28,7 @@ const patchCliResolution = {
 }
 
 await build({
-  entryPoints: [
-    resolve(
-      root,
-      "node_modules/@zed-industries/claude-agent-acp/dist/index.js",
-    ),
-  ],
+  entryPoints: [resolve(root, "node_modules/@zed-industries/claude-agent-acp/dist/index.js")],
   bundle: true,
   platform: "node",
   format: "esm",
@@ -44,8 +39,12 @@ await build({
 
 // Copy cli.js next to the bundle — find it in pnpm's .pnpm store
 import { globSync } from "fs"
+
 const cliCandidates = globSync(
-  resolve(root, "node_modules/.pnpm/@anthropic-ai+claude-agent-sdk*/node_modules/@anthropic-ai/claude-agent-sdk/cli.js"),
+  resolve(
+    root,
+    "node_modules/.pnpm/@anthropic-ai+claude-agent-sdk*/node_modules/@anthropic-ai/claude-agent-sdk/cli.js",
+  ),
 )
 if (cliCandidates.length === 0) {
   throw new Error("Could not find @anthropic-ai/claude-agent-sdk/cli.js in node_modules")

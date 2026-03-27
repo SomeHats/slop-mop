@@ -3,6 +3,7 @@ import { Separator } from "@/components/ui/separator"
 import { SessionPicker } from "./features/agents/session-picker"
 import { ChatSidebar } from "./features/chat/chat-sidebar"
 import { DiffPanel } from "./features/diff/diff-panel"
+import { ExecutePermissionDialog } from "./features/permissions/execute-permission-dialog"
 import { PermissionDialog } from "./features/permissions/permission-dialog"
 import { ProjectPicker } from "./features/projects/project-picker"
 import { useAgentSession } from "./hooks/use-agent-session"
@@ -135,6 +136,13 @@ export function App(): React.JSX.Element {
         onAllowOnce={session.allowOncePermission}
         onDenyOnce={session.denyOncePermission}
         onCreateRules={session.createPermissionRules}
+      />
+      <ExecutePermissionDialog
+        pending={session.pendingExecutePermission}
+        projectId={project.id}
+        onAllowOnce={session.allowOnceExecutePermission}
+        onDenyOnce={session.denyOnceExecutePermission}
+        onCreateRules={session.createExecutePermissionRules}
       />
     </div>
   )

@@ -1,5 +1,18 @@
 import { invoke } from "@tauri-apps/api/core"
-import type { DiffStats, FileDiff, NewRule, PermissionRule, Project, PromptSnapshot } from "./types"
+import type {
+  DiffStats,
+  ExecuteFileRule,
+  ExecuteFlagRule,
+  ExecuteRule,
+  FileDiff,
+  NewExecuteFileRule,
+  NewExecuteFlagRule,
+  NewExecuteRule,
+  NewRule,
+  PermissionRule,
+  Project,
+  PromptSnapshot,
+} from "./types"
 
 export function openProject(path: string): Promise<Project> {
   return invoke<Project>("open_project", { path })
@@ -82,4 +95,40 @@ export function createPermissionRules(rules: NewRule[]): Promise<PermissionRule[
 
 export function deletePermissionRule(id: string): Promise<void> {
   return invoke("delete_permission_rule", { id })
+}
+
+// --- Execute rules ---
+
+export function getExecuteRules(projectId: string): Promise<ExecuteRule[]> {
+  return invoke<ExecuteRule[]>("get_execute_rules", { projectId })
+}
+
+export function getExecuteFlagRules(executeRuleId: string): Promise<ExecuteFlagRule[]> {
+  return invoke<ExecuteFlagRule[]>("get_execute_flag_rules", { executeRuleId })
+}
+
+export function getExecuteFileRules(executeRuleId: string): Promise<ExecuteFileRule[]> {
+  return invoke<ExecuteFileRule[]>("get_execute_file_rules", { executeRuleId })
+}
+
+export function createExecuteRule(rule: NewExecuteRule): Promise<ExecuteRule> {
+  return invoke<ExecuteRule>("create_execute_rule", { rule })
+}
+
+export function createExecuteFlagRules(
+  executeRuleId: string,
+  flags: NewExecuteFlagRule[],
+): Promise<ExecuteFlagRule[]> {
+  return invoke<ExecuteFlagRule[]>("create_execute_flag_rules", { executeRuleId, flags })
+}
+
+export function createExecuteFileRules(
+  executeRuleId: string,
+  files: NewExecuteFileRule[],
+): Promise<ExecuteFileRule[]> {
+  return invoke<ExecuteFileRule[]>("create_execute_file_rules", { executeRuleId, files })
+}
+
+export function deleteExecuteRule(id: string): Promise<void> {
+  return invoke("delete_execute_rule", { id })
 }

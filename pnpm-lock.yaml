@@ -4,6 +4,9 @@ dependencies:
   '@agentclientprotocol/sdk':
     specifier: ^0.16.0
     version: 0.16.0(zod@4.3.6)
+  '@ein/bash-parser':
+    specifier: npm:@jsr/ein__bash-parser@^0.18.0
+    version: /@jsr/ein__bash-parser@0.18.0
   '@fontsource-variable/jetbrains-mono':
     specifier: ^5.2.8
     version: 5.2.8
@@ -1048,6 +1051,22 @@ packages:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  /@jsr/ein__bash-parser@0.18.0:
+    resolution: {integrity: sha512-GDyvevpWRsKeQUQvuWr4p/y1pwnD079vzK7yWjqmbrg7aY6enG8Q6hOptwYUPqefDa1UbXLXHRAzXgYnXN8sDQ==, tarball: https://npm.jsr.io/~/11/@jsr/ein__bash-parser/0.18.0.tgz}
+    dependencies:
+      '@jsr/std__assert': 1.0.19
+    dev: false
+
+  /@jsr/std__assert@1.0.19:
+    resolution: {integrity: sha512-pEj6RPkGbqlgRmyKwATp4cUs6+ijxtdrv3bq8v1d2I2CEcMEyPaO8cVKro61wGRDH4cNg8Zx6haztvK/9m7gkA==, tarball: https://npm.jsr.io/~/11/@jsr/std__assert/1.0.19.tgz}
+    dependencies:
+      '@jsr/std__internal': 1.0.12
+    dev: false
+
+  /@jsr/std__internal@1.0.12:
+    resolution: {integrity: sha512-6xReMW9p+paJgqoFRpOE2nogJFvzPfaLHLIlyADYjKMUcwDyjKZxryIbgcU+gxiTygn8yCjld1HoI0ET4/iZeA==, tarball: https://npm.jsr.io/~/11/@jsr/std__internal/1.0.12.tgz}
+    dev: false
 
   /@modelcontextprotocol/sdk@1.27.1(zod@3.25.76):
     resolution: {integrity: sha512-sr6GbP+4edBwFndLbM60gf07z0FQ79gaExpnsjMGePXqFcSSb7t6iscpjk9DhFhwd+mTEQrzNafGP8/iGGFYaA==}

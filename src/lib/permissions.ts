@@ -1,3 +1,4 @@
+import type { RequestPermissionRequest } from "@agentclientprotocol/sdk"
 import type { PermissionRule } from "./types"
 
 /**
@@ -51,4 +52,22 @@ export function evaluatePath(
   }
 
   return best.decision === "allow" ? "allowed" : "denied"
+}
+
+/**
+ * Find the "allow_once" option from a permission request, falling back to the
+ * first option, or "cancelled" if no options exist.
+ */
+export function findAllowOnceOption(
+  params: RequestPermissionRequest,
+): { outcome: "selected"; optionId: string } | { outcome: "cancelled" } {
+  const opt = params.options.find((o) => o.kind === "allow_once")
+  if (opt) {
+    return { outcome: "selected", optionId: opt.optionId }
+  }
+  const first = params.options[0]
+  if (first) {
+    return { outcome: "selected", optionId: first.optionId }
+  }
+  return { outcome: "cancelled" }
 }

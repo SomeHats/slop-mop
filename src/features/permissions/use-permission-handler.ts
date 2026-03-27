@@ -1,6 +1,6 @@
 import type { RequestPermissionRequest, RequestPermissionResponse } from "@agentclientprotocol/sdk"
 import { useCallback, useRef, useState } from "react"
-import { evaluatePath } from "@/lib/permissions"
+import { evaluatePath, findAllowOnceOption } from "@/lib/permissions"
 import { createPermissionRules, getPermissionRules } from "@/lib/tauri"
 import type { NewRule, PendingPermission, PermissionRule } from "@/lib/types"
 
@@ -14,20 +14,6 @@ type PermissionHandler = {
   allowOnce: () => void
   denyOnce: () => void
   createRulesAndContinue: (rules: NewRule[]) => void
-}
-
-function findAllowOnceOption(
-  params: RequestPermissionRequest,
-): { outcome: "selected"; optionId: string } | { outcome: "cancelled" } {
-  const opt = params.options.find((o) => o.kind === "allow_once")
-  if (opt) {
-    return { outcome: "selected", optionId: opt.optionId }
-  }
-  const first = params.options[0]
-  if (first) {
-    return { outcome: "selected", optionId: first.optionId }
-  }
-  return { outcome: "cancelled" }
 }
 
 export function usePermissionHandler(): PermissionHandler {
