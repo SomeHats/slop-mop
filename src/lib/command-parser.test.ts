@@ -23,6 +23,12 @@ describe("looksLikePath", () => {
     expect(looksLikePath("~/.ssh/config")).toBe(true)
   })
 
+  it("rejects URLs", () => {
+    expect(looksLikePath("https://example.com")).toBe(false)
+    expect(looksLikePath("http://localhost:3000/api")).toBe(false)
+    expect(looksLikePath("ftp://files.example.com/pub")).toBe(false)
+  })
+
   it("rejects plain words", () => {
     expect(looksLikePath("foo")).toBe(false)
     expect(looksLikePath("add")).toBe(false)
@@ -134,6 +140,12 @@ describe("parseCommandString", () => {
         isDynamic: false,
       },
     ])
+  })
+
+  it("does not treat URLs as file args", async () => {
+    const result = await parseCommandString("curl https://example.com/api")
+    expect(result?.[0]?.identity).toBe("curl")
+    expect(result?.[0]?.fileArgs).toEqual([])
   })
 
   it("handles empty string", async () => {

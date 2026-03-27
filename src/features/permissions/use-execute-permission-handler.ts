@@ -1,7 +1,13 @@
 import type { RequestPermissionRequest, RequestPermissionResponse } from "@agentclientprotocol/sdk"
 import { useCallback, useRef, useState } from "react"
 import { parseCommandString } from "@/lib/command-parser"
-import { findAllowOnceOption, pathMatchesPrefix } from "@/lib/permissions"
+import {
+  type EvaluationResult,
+  evaluateCommands,
+  extractCommandString,
+  type RuleWithFlags,
+} from "@/lib/execute-permissions"
+import { findAllowOnceOption } from "@/lib/permissions"
 import {
   createExecuteFileRules,
   createExecuteFlagRules,
@@ -11,206 +17,11 @@ import {
   getExecuteRules,
 } from "@/lib/tauri"
 import type {
-  DeniedCommand,
-  ExecuteFileRule,
-  ExecuteFlagRule,
-  ExecuteRule,
   NewExecuteFileRule,
   NewExecuteFlagRule,
   NewExecuteRule,
-  ParsedCommand,
   PendingExecutePermission,
-  UnmatchedCommand,
 } from "@/lib/types"
-
-function extractCommandString(params: RequestPermissionRequest): string {
-  const rawInput = params.toolCall.rawInput as { command?: string } | undefined
-  if (rawInput && typeof rawInput.command === "string" && rawInput.command.length > 0) {
-    return rawInput.command
-  }
-  return params.toolCall.title ?? ""
-}
-
-type RuleWithFlags = {
-  rule: ExecuteRule
-  flagRules: ExecuteFlagRule[]
-  fileRules: ExecuteFileRule[]
-}
-
-/**
- * Find the matching execute rule for a command identity.
- * Exact match only. Project-specific wins over global.
- */
-function findMatchingRule(
-  identity: string,
-  rules: RuleWithFlags[],
-  projectId: string,
-): RuleWithFlags | null {
-  const projectMatch = rules.find(
-    (r) => r.rule.command === identity && r.rule.project_id === projectId,
-  )
-  if (projectMatch) return projectMatch
-
-  const globalMatch = rules.find((r) => r.rule.command === identity && r.rule.project_id === null)
-  return globalMatch ?? null
-}
-
-/**
- * Evaluate a file arg against workspace and file rules.
- */
-function evaluateFileArg(
-  filePath: string,
-  workspacePath: string,
-  fileRules: ExecuteFileRule[],
-): "allowed" | "denied" | "unmatched" {
-  if (pathMatchesPrefix(filePath, workspacePath)) {
-    return "allowed"
-  }
-
-  const matching = fileRules.filter((r) => pathMatchesPrefix(filePath, r.path_prefix))
-  if (matching.length === 0) return "unmatched"
-
-  // Longest prefix wins
-  let best = matching[0]
-  if (!best) return "unmatched"
-  for (let i = 1; i < matching.length; i++) {
-    const rule = matching[i]
-    if (rule && rule.path_prefix.length > best.path_prefix.length) {
-      best = rule
-    }
-  }
-
-  return best.decision === "allow" ? "allowed" : "denied"
-}
-
-/**
- * Resolve a potentially relative file arg to an absolute path.
- * Simple string-based join — no Node.js `path` module in webview.
- */
-function resolveFileArg(fileArg: string, workspacePath: string): string {
-  if (fileArg.startsWith("/")) return fileArg
-  if (fileArg.startsWith("~")) return fileArg
-  // Join workspace + relative, normalizing double slashes
-  const base = workspacePath.endsWith("/") ? workspacePath : `${workspacePath}/`
-  return `${base}${fileArg}`
-}
-
-type EvaluationResult = {
-  unmatchedCommands: UnmatchedCommand[]
-  deniedCommands: DeniedCommand[]
-  allResolved: boolean
-  allDenied: boolean
-}
-
-function evaluateCommands(
-  commands: ParsedCommand[],
-  rules: RuleWithFlags[],
-  projectId: string,
-  workspacePath: string,
-): EvaluationResult {
-  const unmatched: UnmatchedCommand[] = []
-  const denied: DeniedCommand[] = []
-  let hasUnresolved = false
-
-  for (const cmd of commands) {
-    const match = findMatchingRule(cmd.identity, rules, projectId)
-
-    if (!match) {
-      // No rule for this command at all
-      unmatched.push({
-        command: cmd,
-        unmatchedFlags: [...cmd.flags],
-        deniedFlags: [],
-        unmatchedFiles: cmd.fileArgs
-          .map((f) => resolveFileArg(f, workspacePath))
-          .filter((f) => !pathMatchesPrefix(f, workspacePath)),
-        deniedFiles: [],
-        existingRule: null,
-      })
-      hasUnresolved = true
-      continue
-    }
-
-    if (match.rule.decision === "deny") {
-      denied.push({
-        command: cmd,
-        reason: "command_denied",
-        deniedFlags: [],
-        deniedFiles: [],
-      })
-      continue
-    }
-
-    // Command is allowed — check flags
-    const unmatchedFlags: string[] = []
-    const deniedFlags: string[] = []
-
-    for (const flag of cmd.flags) {
-      const flagRule = match.flagRules.find((fr) => fr.flag === flag)
-      if (!flagRule) {
-        unmatchedFlags.push(flag)
-      } else if (flagRule.decision === "deny") {
-        deniedFlags.push(flag)
-      }
-      // allowed flags are fine
-    }
-
-    if (deniedFlags.length > 0 && unmatchedFlags.length === 0) {
-      denied.push({
-        command: cmd,
-        reason: "flag_denied",
-        deniedFlags,
-        deniedFiles: [],
-      })
-      continue
-    }
-
-    // Check file args
-    const unmatchedFiles: string[] = []
-    const deniedFiles: string[] = []
-
-    for (const fileArg of cmd.fileArgs) {
-      const resolved = resolveFileArg(fileArg, workspacePath)
-      const result = evaluateFileArg(resolved, workspacePath, match.fileRules)
-      if (result === "unmatched") {
-        unmatchedFiles.push(resolved)
-      } else if (result === "denied") {
-        deniedFiles.push(resolved)
-      }
-    }
-
-    if (deniedFiles.length > 0 && unmatchedFiles.length === 0 && unmatchedFlags.length === 0) {
-      denied.push({
-        command: cmd,
-        reason: "file_denied",
-        deniedFlags,
-        deniedFiles,
-      })
-      continue
-    }
-
-    if (unmatchedFlags.length > 0 || unmatchedFiles.length > 0) {
-      unmatched.push({
-        command: cmd,
-        unmatchedFlags,
-        deniedFlags,
-        unmatchedFiles,
-        deniedFiles,
-        existingRule: match.rule,
-      })
-      hasUnresolved = true
-    }
-
-    // Fully matched and allowed — no action needed
-  }
-
-  return {
-    unmatchedCommands: unmatched,
-    deniedCommands: denied,
-    allResolved: !hasUnresolved && denied.length === 0,
-    allDenied: !hasUnresolved && denied.length > 0,
-  }
-}
 
 export type ExecutePermissionHandler = {
   pendingExecutePermission: PendingExecutePermission | null
@@ -240,6 +51,19 @@ async function fetchRulesWithDetails(projectId: string): Promise<RuleWithFlags[]
     results.push({ rule, flagRules, fileRules })
   }
   return results
+}
+
+function resolveFromResult(
+  result: EvaluationResult,
+  params: RequestPermissionRequest,
+): RequestPermissionResponse | null {
+  if (result.allResolved) {
+    return { outcome: findAllowOnceOption(params) }
+  }
+  if (result.allDenied) {
+    return { outcome: { outcome: "cancelled" } }
+  }
+  return null
 }
 
 export function useExecutePermissionHandler(): ExecutePermissionHandler {
@@ -320,13 +144,9 @@ export function useExecutePermissionHandler(): ExecutePermissionHandler {
       // Evaluate
       const result = evaluateCommands(commands, rules, projectId, workspacePath)
 
-      if (result.allResolved) {
-        resolve({ outcome: findAllowOnceOption(params) })
-        return
-      }
-
-      if (result.allDenied) {
-        resolve({ outcome: { outcome: "cancelled" } })
+      const autoResponse = resolveFromResult(result, params)
+      if (autoResponse) {
+        resolve(autoResponse)
         return
       }
 

@@ -16,12 +16,17 @@ export function looksLikePath(arg: string): boolean {
   if (arg === "." || arg === "..") return true
   if (arg.startsWith("/") || arg.startsWith("./") || arg.startsWith("../") || arg.startsWith("~"))
     return true
+  if (arg.includes("://")) return false
   if (arg.includes("/")) return true
   return false
 }
 
 function isFlag(arg: string): boolean {
   return arg.startsWith("-")
+}
+
+function looksLikeUrl(arg: string): boolean {
+  return arg.includes("://")
 }
 
 function wordHasCommandExpansion(word: AstNodeWord): boolean {
@@ -66,7 +71,7 @@ function extractFromCommand(node: AstNodeCommand): ParsedCommand | null {
     const w = suffixWords[i]
     if (!w) break
     const text = w.text
-    if (isFlag(text) || looksLikePath(text)) break
+    if (isFlag(text) || looksLikePath(text) || looksLikeUrl(text)) break
     identityParts.push(text)
     if (wordHasCommandExpansion(w)) isDynamic = true
     i++
