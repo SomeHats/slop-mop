@@ -25,6 +25,7 @@ function isFlag(arg: string): boolean {
 }
 
 function wordHasCommandExpansion(word: AstNodeWord): boolean {
+  if (!word.expansion) return false
   return word.expansion.some((e) => e.type === "CommandExpansion")
 }
 
@@ -52,7 +53,7 @@ function extractFromCommand(node: AstNodeCommand): ParsedCommand | null {
   // Check prefix for dynamic expansions too (e.g. VAR=$(cmd) git ...)
   if (node.prefix) {
     for (const p of node.prefix) {
-      if (p.type === "AssignmentWord" && p.expansion.some((e) => e.type === "CommandExpansion")) {
+      if (p.type === "AssignmentWord" && p.expansion?.some((e) => e.type === "CommandExpansion")) {
         isDynamic = true
       }
     }

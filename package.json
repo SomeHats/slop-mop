@@ -12,6 +12,8 @@
     "check": "biome check .",
     "check:fix": "biome check --fix .",
     "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "tauri": "tauri",
     "prepare": "husky"
   },
@@ -49,7 +51,8 @@
     "lint-staged": "^16.3.3",
     "tailwindcss": "^4.2.1",
     "typescript": "~5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.1.2"
   },
   "lint-staged": {
     "*.{ts,tsx,js,json,css}": "biome check --fix --no-errors-on-unmatched"

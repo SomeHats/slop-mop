@@ -6,6 +6,7 @@ import type { PermissionRule } from "./types"
  * Matches if path equals prefix exactly, or path starts with prefix followed by "/".
  */
 export function pathMatchesPrefix(path: string, prefix: string): boolean {
+  if (prefix === "/") return path.startsWith("/")
   return path === prefix || path.startsWith(`${prefix}/`)
 }
 
