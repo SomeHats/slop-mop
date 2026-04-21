@@ -28,9 +28,6 @@ pub enum Error {
 
     #[error("Watcher error: {0}")]
     Watcher(String),
-
-    #[error("Permission error: {0}")]
-    Permission(String),
 }
 
 impl Serialize for Error {

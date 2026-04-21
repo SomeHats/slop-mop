@@ -11,11 +11,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
-    "resources": {
-      "agent-bundle/claude-agent-acp.mjs": "agent-bundle/claude-agent-acp.mjs",
-      "agent-bundle/cli.js": "agent-bundle/cli.js"
-    }
+    "targets": ["app", "dmg"]
   },
   "app": {
     "windows": [

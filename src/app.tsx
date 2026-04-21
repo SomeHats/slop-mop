@@ -1,14 +1,10 @@
-import { listen } from "@tauri-apps/api/event"
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { Separator } from "@/components/ui/separator"
-import { SessionPicker } from "./features/agents/session-picker"
-import { ChatSidebar } from "./features/chat/chat-sidebar"
+import { ChatSidebar, CURRENT_SESSION_ID } from "./features/chat/chat-sidebar"
 import { DiffPanel } from "./features/diff/diff-panel"
-import { ExecutePermissionDialog } from "./features/permissions/execute-permission-dialog"
-import { PermissionDialog } from "./features/permissions/permission-dialog"
-import { PermissionsEditor } from "./features/permissions/permissions-editor"
 import { ProjectPicker } from "./features/projects/project-picker"
-import { useAgentSession } from "./hooks/use-agent-session"
+import { TerminalPanel } from "./features/terminal/terminal-panel"
+import { useClaudeSession } from "./hooks/use-claude-session"
 import { useDiffStats } from "./hooks/use-diff-stats"
 import { useFullscreen } from "./hooks/use-fullscreen"
 import { useRepoDiff } from "./hooks/use-repo-diff"
@@ -18,66 +14,52 @@ const project = window.__PROJECT
 
 export function App(): React.JSX.Element {
   const fullscreen = useFullscreen()
-  const session = useAgentSession()
-
-  const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null)
-  const [permissionsEditorOpen, setPermissionsEditorOpen] = useState(false)
-
-  const {
-    snapshots,
-    hasActiveSession,
-    isConnected,
-    isProcessing,
-    previousSessions,
-    error,
-    autoCommitPhase,
-  } = session
-
-  // Connect to the agent and start FS watcher on mount
-  useEffect(() => {
-    if (!project) return
-    void session.connect(project.path, project.id)
-    void startWatching(project.path)
-  }, [session.connect])
-
-  // Listen for menu "Permissions…" event
-  useEffect(() => {
-    const unlisten = listen("open-permissions-editor", () => {
-      setPermissionsEditorOpen(true)
-    })
-    return () => {
-      void unlisten.then((fn) => fn())
-    }
-  }, [])
-
-  // Auto-select latest snapshot when list grows
-  useEffect(() => {
-    if (snapshots.length === 0) return
-    const latest = snapshots[snapshots.length - 1]
-    if (latest) {
-      setSelectedSnapshotId(latest.id)
-    }
-  }, [snapshots])
-
-  const diffStats = useDiffStats(project?.path ?? "", snapshots)
-
-  const selectedSnapshot = snapshots.find((s) => s.id === selectedSnapshotId) ?? null
-
-  const { fileDiffs, isLoading: isDiffLoading } = useRepoDiff(
-    project?.path ?? "",
-    selectedSnapshot?.commit_hash ?? null,
-  )
-
-  const handleSendPrompt = useCallback(
-    (text: string, modeId?: string) => {
-      void session.sendPrompt(text, modeId)
-    },
-    [session.sendPrompt],
-  )
 
   if (!project) {
     return <ProjectPicker />
   }
+
+  return (
+    <ProjectApp
+      projectPath={project.path}
+      projectId={project.id}
+      name={project.name}
+      fullscreen={fullscreen}
+    />
+  )
+}
+
+type ProjectAppProps = {
+  projectPath: string
+  projectId: string
+  name: string
+  fullscreen: boolean
+}
+
+function ProjectApp({
+  projectPath,
+  projectId,
+  name,
+  fullscreen,
+}: ProjectAppProps): React.JSX.Element {
+  const session = useClaudeSession(projectPath, projectId)
+  const [selectedId, setSelectedId] = useState<string>(CURRENT_SESSION_ID)
+
+  useEffect(() => {
+    void startWatching(projectPath)
+  }, [projectPath])
+
+  const diffStats = useDiffStats(projectPath, session.snapshots)
+  const selectedSnapshot =
+    selectedId === CURRENT_SESSION_ID
+      ? null
+      : (session.snapshots.find((s) => s.id === selectedId) ?? null)
+  const { fileDiffs, isLoading: isDiffLoading } = useRepoDiff(
+    projectPath,
+    selectedSnapshot?.commit_hash ?? null,
+  )
+
+  const showTerminal = selectedId === CURRENT_SESSION_ID
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -85,83 +67,51 @@ export function App(): React.JSX.Element {
         data-tauri-drag-region
         className={`flex items-center px-4 py-2 ${fullscreen ? "" : "pl-[78px]"}`}
       >
-        <h1 className="text-sm font-bold tracking-tight" title={project.path}>
-          {project.name}
+        <h1 className="text-sm font-bold tracking-tight" title={projectPath}>
+          {name}
         </h1>
       </div>
       <Separator />
 
-      {error ? (
+      {session.error ? (
         <>
           <div className="px-4 py-2">
-            <p className="text-xs text-destructive">{error}</p>
+            <p className="text-xs text-destructive">{session.error}</p>
           </div>
           <Separator />
         </>
       ) : null}
 
       <div className="flex flex-1 overflow-hidden">
-        {hasActiveSession ? (
-          <>
-            <ChatSidebar
-              timeline={session.timeline}
-              snapshots={snapshots}
-              diffStats={diffStats}
-              selectedSnapshotId={selectedSnapshotId}
-              onSelectSnapshot={setSelectedSnapshotId}
-              isProcessing={isProcessing}
-              autoCommitPhase={autoCommitPhase}
-              availableModes={session.availableModes}
-              currentModeId={session.currentModeId}
-              onSendPrompt={handleSendPrompt}
+        <ChatSidebar
+          snapshots={session.snapshots}
+          diffStats={diffStats}
+          selectedSnapshotId={selectedId}
+          onSelect={setSelectedId}
+        />
+        <div className="relative flex-1 overflow-hidden">
+          {/* Terminal stays mounted in layout (real dimensions) so xterm's
+              internal buffer isn't clobbered by 0x0 resize events when we
+              navigate away. When covered, `inert` removes it from the focus +
+              pointer-event tree. */}
+          <div className="absolute inset-0" inert={!showTerminal} aria-hidden={!showTerminal}>
+            <TerminalPanel
+              key={session.agentId ?? "pending"}
+              session={session}
+              visible={showTerminal}
             />
-            <div className="flex-1 overflow-hidden">
+          </div>
+          {!showTerminal && (
+            <div className="absolute inset-0 bg-background">
               <DiffPanel
                 fileDiffs={fileDiffs}
                 isLoading={isDiffLoading}
                 selectedSnapshot={selectedSnapshot}
-                pendingPlanContent={session.pendingPlanContent}
-                onApprovePlan={session.approvePlan}
-                onRejectPlan={session.rejectPlan}
-                onCancelPlan={session.cancelPlan}
               />
             </div>
-          </>
-        ) : isConnected ? (
-          <SessionPicker
-            sessions={previousSessions}
-            isProcessing={isProcessing}
-            onNewSession={() => void session.newSession()}
-            onResumeSession={(id) => void session.resumeSession(id)}
-          />
-        ) : (
-          <div className="flex flex-1 items-center justify-center">
-            <p className="text-sm text-muted-foreground">
-              {isProcessing ? "Connecting..." : "Waiting for connection..."}
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-
-      <PermissionDialog
-        pending={session.pendingPermission}
-        projectId={project.id}
-        onAllowOnce={session.allowOncePermission}
-        onDenyOnce={session.denyOncePermission}
-        onCreateRules={session.createPermissionRules}
-      />
-      <ExecutePermissionDialog
-        pending={session.pendingExecutePermission}
-        projectId={project.id}
-        onAllowOnce={session.allowOnceExecutePermission}
-        onDenyOnce={session.denyOnceExecutePermission}
-        onCreateRules={session.createExecutePermissionRules}
-      />
-      <PermissionsEditor
-        open={permissionsEditorOpen}
-        onOpenChange={setPermissionsEditorOpen}
-        projectId={project.id}
-      />
     </div>
   )
 }

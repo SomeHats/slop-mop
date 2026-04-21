@@ -17,40 +17,25 @@ pub struct PromptSnapshot {
     pub created_at: String,
 }
 
-fn get_head_commit_hash(path: &Path) -> Result<String, Error> {
+pub fn get_head_commit_hash(path: &Path) -> Result<String, Error> {
     let repo = git2::Repository::discover(path)
         .map_err(|_| Error::NotAGitRepo(path.display().to_string()))?;
-    let head = repo.head().map_err(|e| Error::Git(e))?;
-    let commit = head.peel_to_commit().map_err(|e| Error::Git(e))?;
+    let head = repo.head().map_err(Error::Git)?;
+    let commit = head.peel_to_commit().map_err(Error::Git)?;
     Ok(commit.id().to_string())
 }
 
-#[tauri::command]
-pub fn is_worktree_dirty(project_path: String) -> Result<bool, Error> {
-    let repo = git2::Repository::discover(Path::new(&project_path))
-        .map_err(|_| Error::NotAGitRepo(project_path.clone()))?;
-    let statuses = repo
-        .statuses(Some(
-            git2::StatusOptions::new()
-                .include_untracked(true)
-                .recurse_untracked_dirs(true),
-        ))
-        .map_err(Error::Git)?;
-    Ok(!statuses.is_empty())
-}
-
-#[tauri::command]
-pub fn record_prompt_snapshot(
-    db: State<'_, Db>,
-    session_id: String,
-    project_id: String,
-    message_id: String,
-    prompt_text: String,
-    project_path: String,
+/// Insert a snapshot row and return the full record. Shared between the legacy
+/// Tauri command (if any callers remain) and the hook HTTP handler.
+pub fn record_snapshot_inner(
+    db: &Db,
+    session_id: &str,
+    project_id: &str,
+    message_id: &str,
+    prompt_text: &str,
+    commit_hash: &str,
 ) -> Result<PromptSnapshot, Error> {
-    let commit_hash = get_head_commit_hash(Path::new(&project_path))?;
     let id = uuid::Uuid::new_v4().to_string();
-
     let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
 
     conn.execute(
@@ -85,19 +70,19 @@ pub fn record_prompt_snapshot(
 #[tauri::command]
 pub fn list_prompt_snapshots(
     db: State<'_, Db>,
-    session_id: String,
+    project_id: String,
 ) -> Result<Vec<PromptSnapshot>, Error> {
     let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
 
     let mut stmt = conn
         .prepare(
             "SELECT id, session_id, project_id, message_id, prompt_text, commit_hash, created_at
-             FROM prompt_snapshots WHERE session_id = ?1 ORDER BY created_at ASC",
+             FROM prompt_snapshots WHERE project_id = ?1 ORDER BY created_at ASC",
         )
         .map_err(|e| Error::Database(e.to_string()))?;
 
     let snapshots = stmt
-        .query_map(rusqlite::params![session_id], |row| {
+        .query_map(rusqlite::params![project_id], |row| {
             Ok(PromptSnapshot {
                 id: row.get(0)?,
                 session_id: row.get(1)?,

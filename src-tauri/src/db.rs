@@ -46,44 +46,7 @@ impl Db {
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
             CREATE INDEX IF NOT EXISTS idx_prompt_snapshots_session
-                ON prompt_snapshots(session_id, created_at);
-            CREATE TABLE IF NOT EXISTS permission_rules (
-                id TEXT PRIMARY KEY,
-                project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
-                path_prefix TEXT NOT NULL,
-                decision TEXT NOT NULL CHECK(decision IN ('allow', 'deny')),
-                tool_kind TEXT NOT NULL CHECK(tool_kind IN ('read', 'edit')),
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );
-            CREATE INDEX IF NOT EXISTS idx_permission_rules_project
-                ON permission_rules(project_id);
-            CREATE TABLE IF NOT EXISTS execute_rules (
-                id TEXT PRIMARY KEY,
-                project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
-                command TEXT NOT NULL,
-                decision TEXT NOT NULL CHECK(decision IN ('allow', 'deny')),
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );
-            CREATE INDEX IF NOT EXISTS idx_execute_rules_project
-                ON execute_rules(project_id);
-            CREATE TABLE IF NOT EXISTS execute_flag_rules (
-                id TEXT PRIMARY KEY,
-                execute_rule_id TEXT NOT NULL REFERENCES execute_rules(id) ON DELETE CASCADE,
-                flag TEXT NOT NULL,
-                decision TEXT NOT NULL CHECK(decision IN ('allow', 'deny')),
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );
-            CREATE INDEX IF NOT EXISTS idx_execute_flag_rules_rule
-                ON execute_flag_rules(execute_rule_id);
-            CREATE TABLE IF NOT EXISTS execute_file_rules (
-                id TEXT PRIMARY KEY,
-                execute_rule_id TEXT NOT NULL REFERENCES execute_rules(id) ON DELETE CASCADE,
-                path_prefix TEXT NOT NULL,
-                decision TEXT NOT NULL CHECK(decision IN ('allow', 'deny')),
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );
-            CREATE INDEX IF NOT EXISTS idx_execute_file_rules_rule
-                ON execute_file_rules(execute_rule_id);",
+                ON prompt_snapshots(session_id, created_at);",
         )
         .map_err(|e| Error::Database(e.to_string()))?;
         Ok(())

@@ -1,9 +1,8 @@
-mod agent;
+mod claude;
 mod db;
 mod diff;
 mod error;
 mod menu;
-mod permission;
 mod project;
 mod snapshot;
 mod watcher;
@@ -29,7 +28,7 @@ pub fn run() {
             let db_path = data_dir.join("creche.db");
             let database = db::Db::open(&db_path).expect("failed to open database");
             app.manage(database);
-            app.manage(agent::AgentManager::new());
+            app.manage(claude::ClaudeManager::new());
             app.manage(watcher::WatcherManager::new());
             app.manage(LastDestroyedLabel(Mutex::new(String::new())));
 
@@ -46,29 +45,16 @@ pub fn run() {
             project::open_project,
             project::list_recent_projects,
             project::remove_project,
-            agent::spawn_agent,
-            agent::write_agent_stdin,
-            agent::kill_agent,
-            snapshot::is_worktree_dirty,
-            snapshot::record_prompt_snapshot,
+            claude::spawn_claude,
+            claude::write_claude_stdin,
+            claude::resize_claude,
+            claude::kill_claude,
             snapshot::list_prompt_snapshots,
             window::open_project_window,
             diff::batch_diff_stats,
             diff::get_repo_diff,
             watcher::start_watching,
             watcher::stop_watching,
-            permission::get_permission_rules,
-            permission::create_permission_rules,
-            permission::delete_permission_rule,
-            permission::get_execute_rules,
-            permission::get_execute_flag_rules,
-            permission::get_execute_file_rules,
-            permission::create_execute_rule,
-            permission::create_execute_flag_rules,
-            permission::create_execute_file_rules,
-            permission::delete_execute_rule,
-            permission::delete_execute_flag_rule,
-            permission::delete_execute_file_rule,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
@@ -77,8 +63,8 @@ pub fn run() {
                         *label = window.label().to_string();
                     }
                 }
-                // Kill agents and stop watcher owned by this window
-                if let Some(manager) = window.try_state::<agent::AgentManager>() {
+                // Kill claude processes and stop watcher owned by this window
+                if let Some(manager) = window.try_state::<claude::ClaudeManager>() {
                     manager.kill_for_window(window.label());
                 }
                 if let Some(w) = window.try_state::<watcher::WatcherManager>() {

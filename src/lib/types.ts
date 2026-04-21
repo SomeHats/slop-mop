@@ -1,12 +1,3 @@
-import type {
-  SessionMode,
-  ToolCallContent,
-  ToolCallStatus,
-  ToolKind,
-} from "@agentclientprotocol/sdk"
-
-export type { SessionMode }
-
 export type Project = {
   id: string
   name: string
@@ -18,12 +9,6 @@ declare global {
   interface Window {
     __PROJECT?: Project
   }
-}
-
-export type PreviousSession = {
-  sessionId: string
-  title: string | null
-  updatedAt: string | null
 }
 
 export type PromptSnapshot = {
@@ -64,128 +49,4 @@ export type FileDiff = {
   hunks: DiffHunk[]
   additions: number
   deletions: number
-}
-
-export type TimelineEntry =
-  | { kind: "user_message"; id: string; content: string }
-  | { kind: "system_message"; id: string; content: string }
-  | { kind: "agent_message"; id: string; content: string }
-  | { kind: "agent_thought"; id: string; content: string }
-  | {
-      kind: "tool_call"
-      id: string
-      title: string
-      status: ToolCallStatus
-      toolKind?: ToolKind
-      content: ToolCallContent[]
-      rawInput?: unknown
-      rawOutput?: unknown
-    }
-
-export type AutoCommitPhase =
-  | { status: "running"; timelineAnchorId: string }
-  | { status: "failed"; timelineAnchorId: string; error: string }
-
-export type PermissionRule = {
-  id: string
-  project_id: string | null
-  path_prefix: string
-  decision: "allow" | "deny"
-  tool_kind: "read" | "edit"
-  created_at: string
-}
-
-export type NewRule = {
-  project_id: string | null
-  path_prefix: string
-  decision: "allow" | "deny"
-  tool_kind: "read" | "edit"
-}
-
-export type PendingPermission = {
-  request: import("@agentclientprotocol/sdk").RequestPermissionRequest
-  unmatchedPaths: string[]
-  deniedPaths: string[]
-  toolKind: "read" | "edit"
-  projectId: string
-  resolve: (response: import("@agentclientprotocol/sdk").RequestPermissionResponse) => void
-}
-
-// --- Execute permission types ---
-
-export type ExecuteRule = {
-  id: string
-  project_id: string | null
-  command: string
-  decision: "allow" | "deny"
-  created_at: string
-}
-
-export type ExecuteFlagRule = {
-  id: string
-  execute_rule_id: string
-  flag: string
-  decision: "allow" | "deny"
-  created_at: string
-}
-
-export type ExecuteFileRule = {
-  id: string
-  execute_rule_id: string
-  path_prefix: string
-  decision: "allow" | "deny"
-  created_at: string
-}
-
-export type NewExecuteRule = {
-  project_id: string | null
-  command: string
-  decision: "allow" | "deny"
-}
-
-export type NewExecuteFlagRule = {
-  execute_rule_id: string
-  flag: string
-  decision: "allow" | "deny"
-}
-
-export type NewExecuteFileRule = {
-  execute_rule_id: string
-  path_prefix: string
-  decision: "allow" | "deny"
-}
-
-export type ParsedCommand = {
-  identity: string
-  flags: string[]
-  fileArgs: string[]
-  isDynamic: boolean
-}
-
-export type UnmatchedCommand = {
-  command: ParsedCommand
-  unmatchedFlags: string[]
-  deniedFlags: string[]
-  unmatchedFiles: string[]
-  deniedFiles: string[]
-  existingRule: ExecuteRule | null
-}
-
-export type DeniedCommand = {
-  command: ParsedCommand
-  reason: "command_denied" | "flag_denied" | "file_denied"
-  deniedFlags: string[]
-  deniedFiles: string[]
-}
-
-export type PendingExecutePermission = {
-  request: import("@agentclientprotocol/sdk").RequestPermissionRequest
-  rawCommandString: string
-  commands: ParsedCommand[]
-  unmatchedCommands: UnmatchedCommand[]
-  deniedCommands: DeniedCommand[]
-  isDynamic: boolean
-  projectId: string
-  workspacePath: string
-  resolve: (response: import("@agentclientprotocol/sdk").RequestPermissionResponse) => void
 }
