@@ -431,6 +431,32 @@ pub fn create_execute_file_rules(
 }
 
 #[tauri::command]
+pub fn delete_execute_flag_rule(db: State<'_, Db>, id: String) -> Result<(), Error> {
+    let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
+
+    conn.execute(
+        "DELETE FROM execute_flag_rules WHERE id = ?1",
+        rusqlite::params![id],
+    )
+    .map_err(|e| Error::Database(e.to_string()))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_execute_file_rule(db: State<'_, Db>, id: String) -> Result<(), Error> {
+    let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
+
+    conn.execute(
+        "DELETE FROM execute_file_rules WHERE id = ?1",
+        rusqlite::params![id],
+    )
+    .map_err(|e| Error::Database(e.to_string()))?;
+
+    Ok(())
+}
+
+#[tauri::command]
 pub fn delete_execute_rule(db: State<'_, Db>, id: String) -> Result<(), Error> {
     let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
 

@@ -1,5 +1,5 @@
 use tauri::menu::{Menu, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder};
-use tauri::{AppHandle, Manager, Wry};
+use tauri::{AppHandle, Emitter, Manager, Wry};
 
 use crate::db::Db;
 use crate::project;
@@ -12,6 +12,8 @@ pub fn build_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
         .item(&MenuItemBuilder::with_id("open", "Open...").accelerator("CmdOrCtrl+O").build(app)?)
         .separator()
         .item(&recent_submenu)
+        .separator()
+        .item(&MenuItemBuilder::with_id("permissions", "Permissions…").build(app)?)
         .separator()
         .item(&MenuItemBuilder::with_id("close-window", "Close Window").accelerator("CmdOrCtrl+W").build(app)?)
         .build()?;
@@ -70,6 +72,8 @@ pub fn handle_event(app: &AppHandle, event: &tauri::menu::MenuEvent) {
 
     if id == "open" {
         handle_open(app);
+    } else if id == "permissions" {
+        handle_permissions(app);
     } else if id == "close-window" {
         handle_close_window(app);
     } else if let Some(path) = id.strip_prefix("recent:") {
@@ -101,6 +105,16 @@ fn handle_open_recent(app: &AppHandle, path: String) {
             eprintln!("Failed to open recent project: {e}");
         }
     });
+}
+
+fn handle_permissions(app: &AppHandle) {
+    // Emit to the focused project window only
+    for (_, w) in app.webview_windows() {
+        if w.is_focused().unwrap_or(false) && w.label().starts_with("project-") {
+            let _ = w.emit("open-permissions-editor", ());
+            return;
+        }
+    }
 }
 
 fn handle_close_window(app: &AppHandle) {

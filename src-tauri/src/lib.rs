@@ -67,6 +67,8 @@ pub fn run() {
             permission::create_execute_flag_rules,
             permission::create_execute_file_rules,
             permission::delete_execute_rule,
+            permission::delete_execute_flag_rule,
+            permission::delete_execute_file_rule,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event"
 import { useCallback, useEffect, useState } from "react"
 import { Separator } from "@/components/ui/separator"
 import { SessionPicker } from "./features/agents/session-picker"
@@ -5,6 +6,7 @@ import { ChatSidebar } from "./features/chat/chat-sidebar"
 import { DiffPanel } from "./features/diff/diff-panel"
 import { ExecutePermissionDialog } from "./features/permissions/execute-permission-dialog"
 import { PermissionDialog } from "./features/permissions/permission-dialog"
+import { PermissionsEditor } from "./features/permissions/permissions-editor"
 import { ProjectPicker } from "./features/projects/project-picker"
 import { useAgentSession } from "./hooks/use-agent-session"
 import { useDiffStats } from "./hooks/use-diff-stats"
@@ -19,6 +21,7 @@ export function App(): React.JSX.Element {
   const session = useAgentSession()
 
   const [selectedSnapshotId, setSelectedSnapshotId] = useState<string | null>(null)
+  const [permissionsEditorOpen, setPermissionsEditorOpen] = useState(false)
 
   const {
     snapshots,
@@ -36,6 +39,16 @@ export function App(): React.JSX.Element {
     void session.connect(project.path, project.id)
     void startWatching(project.path)
   }, [session.connect])
+
+  // Listen for menu "Permissions…" event
+  useEffect(() => {
+    const unlisten = listen("open-permissions-editor", () => {
+      setPermissionsEditorOpen(true)
+    })
+    return () => {
+      void unlisten.then((fn) => fn())
+    }
+  }, [])
 
   // Auto-select latest snapshot when list grows
   useEffect(() => {
@@ -143,6 +156,11 @@ export function App(): React.JSX.Element {
         onAllowOnce={session.allowOnceExecutePermission}
         onDenyOnce={session.denyOnceExecutePermission}
         onCreateRules={session.createExecutePermissionRules}
+      />
+      <PermissionsEditor
+        open={permissionsEditorOpen}
+        onOpenChange={setPermissionsEditorOpen}
+        projectId={project.id}
       />
     </div>
   )

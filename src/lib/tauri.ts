@@ -132,3 +132,11 @@ export function createExecuteFileRules(
 export function deleteExecuteRule(id: string): Promise<void> {
   return invoke("delete_execute_rule", { id })
 }
+
+export function deleteExecuteFlagRule(id: string): Promise<void> {
+  return invoke("delete_execute_flag_rule", { id })
+}
+
+export function deleteExecuteFileRule(id: string): Promise<void> {
+  return invoke("delete_execute_file_rule", { id })
+}
