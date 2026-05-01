@@ -107,6 +107,11 @@ export function ChatSidebar({
 
   const handleMouseDown = (key: RowKey, e: React.MouseEvent): void => {
     if (e.button !== 0) return
+    // A cross-row drag ends with mouseup on a different element than
+    // mousedown, so the browser never fires a click — meaning a stale
+    // `suppressClickRef=true` from that drag would silently swallow the
+    // user's next real click. Clear it at the start of every new gesture.
+    suppressClickRef.current = false
     dragAnchorRef.current = key
     dragStartedRef.current = false
     mouseStartXYRef.current = { x: e.clientX, y: e.clientY }
@@ -185,8 +190,7 @@ export function ChatSidebar({
             // No selection at all = "back to terminal" state, which we
             // represent visually by lighting the Current Session node.
             const isCurrent = row.key === null
-            const inRange =
-              isInRange(row.index) || (selection === null && isCurrent)
+            const inRange = isInRange(row.index) || (selection === null && isCurrent)
             const aboveLit = inRange && isInRange(row.index - 1)
             const belowLit = inRange && isInRange(row.index + 1)
 
