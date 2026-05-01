@@ -318,8 +318,8 @@ function Row({
         {!isFirst && (
           <span
             className={cn(
-              "absolute left-1/2 top-0 h-1/2 w-px -translate-x-1/2",
-              aboveLit ? "bg-primary" : "bg-border",
+              "absolute left-1/2 top-0 h-1/2 w-[2px] -translate-x-1/2",
+              aboveLit ? "bg-primary" : "bg-muted-foreground/60",
             )}
           />
         )}
@@ -327,16 +327,16 @@ function Row({
         {!isLast && (
           <span
             className={cn(
-              "absolute left-1/2 top-1/2 h-1/2 w-px -translate-x-1/2",
-              belowLit ? "bg-primary" : "bg-border",
+              "absolute left-1/2 top-1/2 h-1/2 w-[2px] -translate-x-1/2",
+              belowLit ? "bg-primary" : "bg-muted-foreground/60",
             )}
           />
         )}
         {/* node */}
         <span
           className={cn(
-            "absolute left-1/2 top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2",
-            inRange ? "border-primary bg-primary" : "border-border bg-background",
+            "absolute left-1/2 top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2",
+            inRange ? "border-primary bg-primary" : "border-muted-foreground/60 bg-background",
           )}
         />
       </div>
