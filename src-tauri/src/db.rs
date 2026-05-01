@@ -29,24 +29,16 @@ impl Db {
 
     fn migrate(&self) -> Result<(), Error> {
         let conn = self.0.lock().map_err(|e| Error::Database(e.to_string()))?;
+        // History is now sourced from git log (see commits.rs); the legacy
+        // prompt_snapshots table from earlier builds is left in place if it
+        // exists — harmless and avoids destructive DROP on first launch.
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS projects (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
                 path TEXT NOT NULL UNIQUE,
                 opened_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );
-            CREATE TABLE IF NOT EXISTS prompt_snapshots (
-                id TEXT PRIMARY KEY,
-                session_id TEXT NOT NULL,
-                project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-                message_id TEXT NOT NULL,
-                prompt_text TEXT NOT NULL,
-                commit_hash TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );
-            CREATE INDEX IF NOT EXISTS idx_prompt_snapshots_session
-                ON prompt_snapshots(session_id, created_at);",
+            );",
         )
         .map_err(|e| Error::Database(e.to_string()))?;
         Ok(())

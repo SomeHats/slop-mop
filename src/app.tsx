@@ -44,21 +44,23 @@ function ProjectApp({
   fullscreen,
 }: ProjectAppProps): React.JSX.Element {
   const session = useClaudeSession(projectPath, projectId)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedHash, setSelectedHash] = useState<string | null>(null)
 
   useEffect(() => {
     void startWatching(projectPath)
   }, [projectPath])
 
-  const diffStats = useDiffStats(projectPath, session.snapshots)
-  const selectedSnapshot =
-    selectedId === null ? null : (session.snapshots.find((s) => s.id === selectedId) ?? null)
+  const diffStats = useDiffStats(projectPath, session.commits)
+  const selectedCommit =
+    selectedHash === null
+      ? null
+      : (session.commits.find((c) => c.commit_hash === selectedHash) ?? null)
   const { fileDiffs, isLoading: isDiffLoading } = useRepoDiff(
     projectPath,
-    selectedSnapshot?.commit_hash ?? null,
+    selectedCommit?.commit_hash ?? null,
   )
 
-  const showTerminal = selectedId === null
+  const showTerminal = selectedHash === null
   // The `claude --resume` picker doesn't offer a "start new session" option, so we
   // overlay our own button while the user hasn't picked a session yet. Once the
   // SessionStart hook fires (either pick from picker, or our restart-without-resume),
@@ -89,10 +91,10 @@ function ProjectApp({
 
       <div className="flex flex-1 overflow-hidden">
         <ChatSidebar
-          snapshots={session.snapshots}
+          commits={session.commits}
           diffStats={diffStats}
-          selectedSnapshotId={selectedId}
-          onSelect={setSelectedId}
+          selectedCommitHash={selectedHash}
+          onSelect={setSelectedHash}
         />
         <div className="relative flex-1 overflow-hidden">
           {/* Terminal stays mounted in layout (real dimensions) so xterm's
@@ -125,7 +127,7 @@ function ProjectApp({
               <DiffPanel
                 fileDiffs={fileDiffs}
                 isLoading={isDiffLoading}
-                selectedSnapshot={selectedSnapshot}
+                selectedCommit={selectedCommit}
               />
             </div>
           )}

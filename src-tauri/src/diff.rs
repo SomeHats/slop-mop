@@ -7,7 +7,7 @@ use crate::error::Error;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct DiffStats {
-    pub snapshot_id: String,
+    pub commit_hash: String,
     pub additions: u32,
     pub deletions: u32,
 }
@@ -54,49 +54,24 @@ fn delta_to_status(delta: Delta) -> &'static str {
     }
 }
 
-/// Diff between two commits (tree-to-tree).
-fn diff_between_commits<'a>(
-    repo: &'a Repository,
-    old_hash: &str,
-    new_hash: &str,
-) -> Result<git2::Diff<'a>, Error> {
-    let old_commit = repo
-        .revparse_single(old_hash)
-        .map_err(Error::Git)?
-        .peel_to_commit()
-        .map_err(Error::Git)?;
-    let new_commit = repo
-        .revparse_single(new_hash)
-        .map_err(Error::Git)?
-        .peel_to_commit()
-        .map_err(Error::Git)?;
-
-    let old_tree = old_commit.tree().map_err(Error::Git)?;
-    let new_tree = new_commit.tree().map_err(Error::Git)?;
-
-    let mut opts = DiffOptions::new();
-    opts.include_untracked(true)
-        .context_lines(100_000);
-
-    repo.diff_tree_to_tree(Some(&old_tree), Some(&new_tree), Some(&mut opts))
-        .map_err(Error::Git)
-}
-
-/// Diff from a commit to the current working directory (including index).
-fn diff_commit_to_workdir<'a>(repo: &'a Repository, hash: &str) -> Result<git2::Diff<'a>, Error> {
+/// Diff a commit against its first parent. For root commits (no parent),
+/// returns a tree-to-empty diff so additions show up against nothing.
+fn diff_commit_vs_parent<'a>(repo: &'a Repository, hash: &str) -> Result<git2::Diff<'a>, Error> {
     let commit = repo
         .revparse_single(hash)
         .map_err(Error::Git)?
         .peel_to_commit()
         .map_err(Error::Git)?;
-    let tree = commit.tree().map_err(Error::Git)?;
+    let new_tree = commit.tree().map_err(Error::Git)?;
+    let parent_tree = match commit.parent(0) {
+        Ok(parent) => Some(parent.tree().map_err(Error::Git)?),
+        Err(_) => None, // root commit
+    };
 
     let mut opts = DiffOptions::new();
-    opts.include_untracked(true)
-        .recurse_untracked_dirs(true)
-        .context_lines(100_000);
+    opts.include_untracked(true).context_lines(100_000);
 
-    repo.diff_tree_to_workdir_with_index(Some(&tree), Some(&mut opts))
+    repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&new_tree), Some(&mut opts))
         .map_err(Error::Git)
 }
 
@@ -108,29 +83,17 @@ fn stats_from_diff(diff: &git2::Diff<'_>) -> Result<(u32, u32), Error> {
 #[tauri::command]
 pub fn batch_diff_stats(
     project_path: String,
-    snapshot_hashes: Vec<(String, String)>,
+    commit_hashes: Vec<String>,
 ) -> Result<Vec<DiffStats>, Error> {
     let repo = Repository::discover(Path::new(&project_path))
         .map_err(|_| Error::NotAGitRepo(project_path.clone()))?;
 
-    let len = snapshot_hashes.len();
-    let mut results = Vec::with_capacity(len);
-
-    for i in 0..len {
-        let (ref snapshot_id, ref commit_hash) = snapshot_hashes[i];
-
-        let diff = if i + 1 < len {
-            // Diff between this commit and the next commit
-            let (_, ref next_hash) = snapshot_hashes[i + 1];
-            diff_between_commits(&repo, commit_hash, next_hash)?
-        } else {
-            // Last entry: diff to current working directory
-            diff_commit_to_workdir(&repo, commit_hash)?
-        };
-
+    let mut results = Vec::with_capacity(commit_hashes.len());
+    for commit_hash in &commit_hashes {
+        let diff = diff_commit_vs_parent(&repo, commit_hash)?;
         let (additions, deletions) = stats_from_diff(&diff)?;
         results.push(DiffStats {
-            snapshot_id: snapshot_id.clone(),
+            commit_hash: commit_hash.clone(),
             additions,
             deletions,
         });
@@ -144,7 +107,7 @@ pub fn get_repo_diff(project_path: String, commit_hash: String) -> Result<Vec<Fi
     let repo = Repository::discover(Path::new(&project_path))
         .map_err(|_| Error::NotAGitRepo(project_path.clone()))?;
 
-    let diff = diff_commit_to_workdir(&repo, &commit_hash)?;
+    let diff = diff_commit_vs_parent(&repo, &commit_hash)?;
 
     let mut file_diffs: Vec<FileDiff> = Vec::new();
 

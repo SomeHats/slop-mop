@@ -1,20 +1,20 @@
 import { Loader2 } from "lucide-react"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import type { FileDiff, PromptSnapshot } from "@/lib/types"
+import type { FileDiff, SessionCommit } from "@/lib/types"
 import { SideBySideDiff } from "./side-by-side-diff"
 
 type DiffPanelProps = {
   fileDiffs: FileDiff[]
   isLoading: boolean
-  selectedSnapshot: PromptSnapshot | null
+  selectedCommit: SessionCommit | null
 }
 
 export function DiffPanel({
   fileDiffs,
   isLoading,
-  selectedSnapshot,
+  selectedCommit,
 }: DiffPanelProps): React.JSX.Element {
-  if (!selectedSnapshot) {
+  if (!selectedCommit) {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-sm text-muted-foreground">Select a prompt to view diffs</p>
@@ -33,7 +33,7 @@ export function DiffPanel({
   if (fileDiffs.length === 0) {
     return (
       <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-muted-foreground">No changes since this prompt</p>
+        <p className="text-sm text-muted-foreground">No changes in this prompt</p>
       </div>
     )
   }

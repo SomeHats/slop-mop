@@ -1,10 +1,11 @@
 mod claude;
+mod commits;
 mod db;
 mod diff;
 mod error;
+mod git;
 mod menu;
 mod project;
-mod snapshot;
 mod watcher;
 mod window;
 
@@ -49,7 +50,7 @@ pub fn run() {
             claude::write_claude_stdin,
             claude::resize_claude,
             claude::kill_claude,
-            snapshot::list_prompt_snapshots,
+            commits::list_session_commits,
             window::open_project_window,
             diff::batch_diff_stats,
             diff::get_repo_diff,

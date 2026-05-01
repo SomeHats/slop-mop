@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import type { DiffStats, FileDiff, Project, PromptSnapshot } from "./types"
+import type { DiffStats, FileDiff, Project, SessionCommit } from "./types"
 
 export function openProject(path: string): Promise<Project> {
   return invoke<Project>("open_project", { path })
@@ -41,15 +41,15 @@ export function killClaude(agentId: string): Promise<void> {
   return invoke("kill_claude", { agentId })
 }
 
-export function listPromptSnapshots(projectId: string): Promise<PromptSnapshot[]> {
-  return invoke<PromptSnapshot[]>("list_prompt_snapshots", { projectId })
+export function listSessionCommits(
+  projectPath: string,
+  sessionId: string,
+): Promise<SessionCommit[]> {
+  return invoke<SessionCommit[]>("list_session_commits", { projectPath, sessionId })
 }
 
-export function batchDiffStats(
-  projectPath: string,
-  snapshotHashes: [string, string][],
-): Promise<DiffStats[]> {
-  return invoke<DiffStats[]>("batch_diff_stats", { projectPath, snapshotHashes })
+export function batchDiffStats(projectPath: string, commitHashes: string[]): Promise<DiffStats[]> {
+  return invoke<DiffStats[]>("batch_diff_stats", { projectPath, commitHashes })
 }
 
 export function getRepoDiff(projectPath: string, commitHash: string): Promise<FileDiff[]> {

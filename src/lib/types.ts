@@ -11,18 +11,17 @@ declare global {
   }
 }
 
-export type PromptSnapshot = {
-  id: string
-  session_id: string
-  project_id: string
-  message_id: string
-  prompt_text: string
+export type SessionCommit = {
   commit_hash: string
-  created_at: string
+  session_id: string
+  /** First line of the commit message (the prompt). */
+  prompt: string
+  /** Commit time, unix seconds (UTC). */
+  timestamp_unix: number
 }
 
 export type DiffStats = {
-  snapshot_id: string
+  commit_hash: string
   additions: number
   deletions: number
 }

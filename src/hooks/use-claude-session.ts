@@ -2,17 +2,17 @@ import { listen } from "@tauri-apps/api/event"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   killClaude,
-  listPromptSnapshots,
+  listSessionCommits,
   resizeClaude,
   spawnClaude,
   writeClaudeStdin,
 } from "@/lib/tauri"
-import type { PromptSnapshot } from "@/lib/types"
+import type { SessionCommit } from "@/lib/types"
 
 export type SessionStartSource = "startup" | "resume" | "clear" | "compact" | (string & {})
 
 export type ClaudeSession = {
-  snapshots: PromptSnapshot[]
+  commits: SessionCommit[]
   agentId: string | null
   /** Claude session id, captured when the SessionStart hook first fires. */
   sessionId: string | null
@@ -48,8 +48,8 @@ function encodeBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
-export function useClaudeSession(projectPath: string, projectId: string): ClaudeSession {
-  const [snapshots, setSnapshots] = useState<PromptSnapshot[]>([])
+export function useClaudeSession(projectPath: string, _projectId: string): ClaudeSession {
+  const [commits, setCommits] = useState<SessionCommit[]>([])
   const [agentId, setAgentId] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [sessionSource, setSessionSource] = useState<SessionStartSource | null>(null)
@@ -67,17 +67,8 @@ export function useClaudeSession(projectPath: string, projectId: string): Claude
 
     void (async () => {
       try {
-        // Load existing snapshots once (only on first spawn — restarts don't need to refetch).
-        if (spawnSeq === 0) {
-          try {
-            const existing = await listPromptSnapshots(projectId)
-            if (!cancelled) setSnapshots(existing)
-          } catch {
-            // non-fatal
-          }
-        }
-
-        const result = await spawnClaude(projectPath, projectId, resumeMode)
+        console.log("[creche] spawning claude", { spawnSeq, resumeMode })
+        const result = await spawnClaude(projectPath, _projectId, resumeMode)
         if (cancelled) {
           void killClaude(result.agent_id)
           return
@@ -95,15 +86,6 @@ export function useClaudeSession(projectPath: string, projectId: string): Claude
         )
         unlisteners.push(outputUnlisten)
 
-        const snapshotUnlisten = await listen<{ snapshot: PromptSnapshot }>(
-          "snapshot-added",
-          (evt) => {
-            console.log("[creche] snapshot-added", evt.payload.snapshot)
-            setSnapshots((prev) => [...prev, evt.payload.snapshot])
-          },
-        )
-        unlisteners.push(snapshotUnlisten)
-
         const sessionUnlisten = await listen<{
           agent_id: string
           session_id: string
@@ -113,8 +95,39 @@ export function useClaudeSession(projectPath: string, projectId: string): Claude
           console.log("[creche] session-started", evt.payload)
           setSessionId(evt.payload.session_id)
           setSessionSource(evt.payload.source)
+          // Seed history from git log for this session.
+          void listSessionCommits(projectPath, evt.payload.session_id).then(
+            (loaded) => {
+              if (!cancelled && agentIdRef.current === evt.payload.agent_id) {
+                setCommits(loaded)
+              }
+            },
+            (e) => console.error("[creche] listSessionCommits failed", e),
+          )
         })
         unlisteners.push(sessionUnlisten)
+
+        const committedUnlisten = await listen<{
+          agent_id: string
+          session_id: string
+          commit_hash: string
+          prompt: string
+          timestamp_unix: number
+        }>("prompt-committed", (evt) => {
+          if (evt.payload.agent_id !== agentIdRef.current) return
+          console.log("[creche] prompt-committed", evt.payload)
+          // git2 walks newest-first from HEAD, so prepend.
+          setCommits((prev) => [
+            {
+              commit_hash: evt.payload.commit_hash,
+              session_id: evt.payload.session_id,
+              prompt: evt.payload.prompt,
+              timestamp_unix: evt.payload.timestamp_unix,
+            },
+            ...prev,
+          ])
+        })
+        unlisteners.push(committedUnlisten)
 
         setIsConnecting(false)
       } catch (e) {
@@ -134,7 +147,7 @@ export function useClaudeSession(projectPath: string, projectId: string): Claude
         agentIdRef.current = null
       }
     }
-  }, [projectPath, projectId, spawnSeq, resumeMode])
+  }, [projectPath, _projectId, spawnSeq, resumeMode])
 
   const onOutput = useCallback((listener: (bytes: Uint8Array) => void): (() => void) => {
     outputListenersRef.current.add(listener)
@@ -160,12 +173,13 @@ export function useClaudeSession(projectPath: string, projectId: string): Claude
     setSessionId(null)
     setSessionSource(null)
     setAgentId(null)
+    setCommits([])
     setIsConnecting(true)
     setSpawnSeq((s) => s + 1)
   }, [])
 
   return {
-    snapshots,
+    commits,
     agentId,
     sessionId,
     sessionSource,

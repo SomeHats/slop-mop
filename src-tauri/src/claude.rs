@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
@@ -14,9 +14,10 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tiny_http::{Method, Response, Server};
 
-use crate::db::Db;
 use crate::error::Error;
-use crate::snapshot::{self, PromptSnapshot};
+use crate::git::{
+    commit_with_session_trailer, get_head_commit_hash, stage_all_and_check_dirty,
+};
 
 /// Resolve the user's login-shell PATH once. macOS GUI apps launched from
 /// Finder otherwise get a minimal PATH that won't include brew/nvm/etc.
@@ -57,6 +58,10 @@ pub struct ClaudeProcess {
     /// The Claude session id, captured when the SessionStart hook fires. None
     /// while the user is sitting in the `--resume` picker (no session active yet).
     session_id: Arc<Mutex<Option<String>>>,
+    /// Prompt text from the most recent UserPromptSubmit, awaiting Stop. Taken
+    /// (cleared) by the Stop handler so it can use it as the post-prompt commit
+    /// message.
+    pending_prompt: Arc<Mutex<Option<String>>>,
 }
 
 pub struct ClaudeManager(pub Mutex<HashMap<String, ClaudeProcess>>);
@@ -149,6 +154,9 @@ pub fn spawn_claude(
     let session_hook_url = format!(
         "http://127.0.0.1:{hook_port}/session-start?project_id={project_id}&agent_id={agent_id}"
     );
+    let stop_hook_url = format!(
+        "http://127.0.0.1:{hook_port}/stop?project_id={project_id}&agent_id={agent_id}"
+    );
     let settings_json = serde_json::json!({
         "hooks": {
             "UserPromptSubmit": [
@@ -174,6 +182,18 @@ pub fn spawn_claude(
                         }
                     ]
                 }
+            ],
+            "Stop": [
+                {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": format!(
+                                "curl -sS --max-time 30 -X POST '{stop_hook_url}' --data-binary @-"
+                            )
+                        }
+                    ]
+                }
             ]
         }
     });
@@ -189,6 +209,7 @@ pub fn spawn_claude(
     );
     eprintln!("[claude] prompt hook: {prompt_hook_url}");
     eprintln!("[claude] session-start hook: {session_hook_url}");
+    eprintln!("[claude] stop hook: {stop_hook_url}");
 
     // 3. Resolve the `claude` binary.
     let claude_bin = find_claude().ok_or_else(|| {
@@ -274,6 +295,7 @@ pub fn spawn_claude(
     }
 
     let session_id = Arc::new(Mutex::new(None::<String>));
+    let pending_prompt = Arc::new(Mutex::new(None::<String>));
 
     // 6. Hook listener thread.
     {
@@ -291,6 +313,7 @@ pub fn spawn_claude(
         settings_path,
         hook_server: server,
         session_id,
+        pending_prompt,
     };
 
     manager
@@ -378,8 +401,12 @@ pub fn kill_claude(manager: State<'_, ClaudeManager>, agent_id: String) -> Resul
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Serialize)]
-struct SnapshotAddedEvent {
-    snapshot: PromptSnapshot,
+struct PromptCommittedEvent {
+    agent_id: String,
+    session_id: String,
+    commit_hash: String,
+    prompt: String,
+    timestamp_unix: i64,
 }
 
 fn run_hook_server(app: AppHandle, window_label: String, server: Arc<Server>) {
@@ -417,7 +444,7 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
 
     let url = req.url().to_string();
     let path = url.split('?').next().unwrap_or("").to_string();
-    let (project_id, agent_id) = parse_query(&url);
+    let (_project_id, agent_id) = parse_query(&url);
 
     let mut body = String::new();
     if let Err(e) = req.as_reader().read_to_string(&mut body) {
@@ -437,8 +464,9 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
     };
 
     match path.as_str() {
-        "/prompt" => handle_prompt(app, window_label, &project_id, &parsed, t_start),
+        "/prompt" => handle_prompt(app, &agent_id, &parsed),
         "/session-start" => handle_session_start(app, window_label, &agent_id, &parsed),
+        "/stop" => handle_stop(app, window_label, &agent_id, &parsed),
         other => eprintln!("[hook] unknown path: {other}"),
     }
 
@@ -446,17 +474,13 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
     eprintln!("[hook] responded 200 ({:?} total)", t_start.elapsed());
 }
 
-fn handle_prompt(
-    app: &AppHandle,
-    window_label: &str,
-    project_id: &str,
-    parsed: &serde_json::Value,
-    t_start: std::time::Instant,
-) {
+/// UserPromptSubmit: stash the prompt for the upcoming Stop, and commit any
+/// pre-existing uncommitted work as a "check point" so Claude's diff is clean.
+fn handle_prompt(app: &AppHandle, agent_id: &str, parsed: &serde_json::Value) {
     let session_id = parsed
         .get("session_id")
         .and_then(|v| v.as_str())
-        .unwrap_or("unknown")
+        .unwrap_or("")
         .to_string();
     let prompt = parsed
         .get("prompt")
@@ -469,21 +493,128 @@ fn handle_prompt(
         .map(PathBuf::from);
 
     eprintln!(
-        "[hook] prompt project_id={project_id} session_id={session_id} prompt_len={} cwd={:?}",
+        "[hook] prompt agent_id={agent_id} session_id={session_id} prompt_len={} cwd={:?}",
         prompt.len(),
         cwd
     );
 
-    // Best-effort: commit + record snapshot. If anything fails, still respond 200
-    // so the prompt proceeds — we never want the hook to block the user.
-    if let Some(path) = cwd.as_deref() {
-        match commit_and_record(app, window_label, project_id, &session_id, &prompt, path) {
-            Ok(()) => eprintln!("[hook] commit_and_record ok ({:?})", t_start.elapsed()),
-            Err(e) => eprintln!("[hook] commit_and_record failed: {e}"),
+    // Cache the prompt so the Stop handler can use it as the commit subject.
+    if let Some(manager) = app.try_state::<ClaudeManager>() {
+        if let Ok(procs) = manager.0.lock() {
+            if let Some(p) = procs.get(agent_id) {
+                if let Ok(mut slot) = p.pending_prompt.lock() {
+                    *slot = Some(prompt.clone());
+                }
+            }
         }
-    } else {
-        eprintln!("[hook] missing cwd in hook payload");
     }
+
+    let Some(path) = cwd.as_deref() else {
+        eprintln!("[hook] missing cwd in hook payload");
+        return;
+    };
+    if session_id.is_empty() {
+        eprintln!("[hook] missing session_id; skipping checkpoint");
+        return;
+    }
+
+    match stage_all_and_check_dirty(path) {
+        Ok(false) => eprintln!("[hook] checkpoint skipped (clean tree)"),
+        Ok(true) => match commit_with_session_trailer(path, &session_id, "check point") {
+            Ok(()) => eprintln!("[hook] checkpoint committed"),
+            Err(e) => eprintln!("[hook] checkpoint commit failed: {e}"),
+        },
+        Err(e) => eprintln!("[hook] checkpoint stage failed: {e}"),
+    }
+}
+
+/// Stop: commit Claude's changes (if any) with the prompt as the message.
+fn handle_stop(
+    app: &AppHandle,
+    window_label: &str,
+    agent_id: &str,
+    parsed: &serde_json::Value,
+) {
+    let session_id = parsed
+        .get("session_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let cwd = parsed
+        .get("cwd")
+        .and_then(|v| v.as_str())
+        .map(PathBuf::from);
+
+    let prompt = take_pending_prompt(app, agent_id);
+    eprintln!(
+        "[hook] stop agent_id={agent_id} session_id={session_id} has_prompt={} cwd={:?}",
+        prompt.is_some(),
+        cwd
+    );
+
+    let (Some(path), Some(prompt)) = (cwd.as_deref(), prompt) else {
+        return;
+    };
+    if session_id.is_empty() {
+        return;
+    }
+
+    let dirty = match stage_all_and_check_dirty(path) {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("[hook] stop stage failed: {e}");
+            return;
+        }
+    };
+    if !dirty {
+        eprintln!("[hook] stop skipped (no changes from prompt)");
+        return;
+    }
+
+    let subject = first_line(&prompt);
+    if let Err(e) = commit_with_session_trailer(path, &session_id, &subject) {
+        eprintln!("[hook] stop commit failed: {e}");
+        return;
+    }
+
+    let commit_hash = match get_head_commit_hash(path) {
+        Ok(h) => h,
+        Err(e) => {
+            eprintln!("[hook] stop: get HEAD failed: {e}");
+            return;
+        }
+    };
+    let timestamp_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    let event = PromptCommittedEvent {
+        agent_id: agent_id.to_string(),
+        session_id,
+        commit_hash,
+        prompt: subject,
+        timestamp_unix,
+    };
+    for (_, w) in app.webview_windows() {
+        if w.label() == window_label {
+            let _ = w.emit("prompt-committed", event.clone());
+            break;
+        }
+    }
+    eprintln!("[hook] stop commit emitted");
+}
+
+fn take_pending_prompt(app: &AppHandle, agent_id: &str) -> Option<String> {
+    let manager = app.try_state::<ClaudeManager>()?;
+    let procs = manager.0.lock().ok()?;
+    let proc = procs.get(agent_id)?;
+    let mut slot = proc.pending_prompt.lock().ok()?;
+    slot.take()
+}
+
+fn first_line(s: &str) -> String {
+    s.lines().next().unwrap_or("").trim().to_string()
 }
 
 fn handle_session_start(
@@ -577,104 +708,3 @@ fn url_decode(s: &str) -> String {
     out
 }
 
-fn commit_and_record(
-    app: &AppHandle,
-    window_label: &str,
-    project_id: &str,
-    session_id: &str,
-    prompt: &str,
-    cwd: &Path,
-) -> Result<(), String> {
-    // Stage everything and commit with placeholder message (allow-empty so prompts with
-    // no changes still produce a snapshot anchor).
-    let placeholder = format!(
-        "creche: {}",
-        prompt.lines().next().unwrap_or("").trim().chars().take(72).collect::<String>()
-    );
-    let t_add = std::time::Instant::now();
-    let git_add = Command::new("git")
-        .args(["add", "--all"])
-        .current_dir(cwd)
-        .status()
-        .map_err(|e| format!("git add: {e}"))?;
-    eprintln!(
-        "[hook] git add --all exit={:?} ({:?})",
-        git_add.code(),
-        t_add.elapsed()
-    );
-    if !git_add.success() {
-        return Err("git add --all failed".into());
-    }
-
-    // `git diff --cached --quiet` returns 0 when the index matches HEAD (nothing
-    // to commit). If there's nothing to commit, just snapshot the current HEAD.
-    let diff_status = Command::new("git")
-        .args(["diff", "--cached", "--quiet"])
-        .current_dir(cwd)
-        .status()
-        .map_err(|e| format!("git diff --cached: {e}"))?;
-    let has_changes = !diff_status.success();
-    eprintln!("[hook] has_changes={has_changes}");
-
-    if has_changes {
-        let t_commit = std::time::Instant::now();
-        // --no-verify: skip the user's pre-commit hooks (these are checkpoint commits,
-        // not real review-ready commits, and an interactive hook would hang us forever).
-        // --no-gpg-sign: avoid triggering a pinentry prompt we can't respond to.
-        let git_commit = Command::new("git")
-            .args([
-                "commit",
-                "--no-verify",
-                "--no-gpg-sign",
-                "-m",
-                &placeholder,
-            ])
-            .current_dir(cwd)
-            .output()
-            .map_err(|e| format!("git commit: {e}"))?;
-        eprintln!(
-            "[hook] git commit exit={:?} ({:?}) stdout_bytes={} stderr_bytes={}",
-            git_commit.status.code(),
-            t_commit.elapsed(),
-            git_commit.stdout.len(),
-            git_commit.stderr.len()
-        );
-        if !git_commit.status.success() {
-            return Err(format!(
-                "git commit failed: {}",
-                String::from_utf8_lossy(&git_commit.stderr)
-            ));
-        }
-    }
-
-    let commit_hash = snapshot::get_head_commit_hash(cwd).map_err(|e| e.to_string())?;
-    eprintln!("[hook] commit_hash={commit_hash} (committed={has_changes})");
-
-    let db = app
-        .try_state::<Db>()
-        .ok_or_else(|| "db state missing".to_string())?;
-    let message_id = uuid::Uuid::new_v4().to_string();
-    let snap = snapshot::record_snapshot_inner(
-        &db,
-        session_id,
-        project_id,
-        &message_id,
-        prompt,
-        &commit_hash,
-    )
-    .map_err(|e| e.to_string())?;
-    eprintln!("[hook] snapshot inserted id={}", snap.id);
-
-    // Emit to the specific project window.
-    let mut emitted = false;
-    for (_, w) in app.webview_windows() {
-        if w.label() == window_label {
-            let _ = w.emit("snapshot-added", SnapshotAddedEvent { snapshot: snap.clone() });
-            emitted = true;
-            break;
-        }
-    }
-    eprintln!("[hook] snapshot-added emitted={emitted}");
-
-    Ok(())
-}
