@@ -52,8 +52,12 @@ export function batchDiffStats(projectPath: string, commitHashes: string[]): Pro
   return invoke<DiffStats[]>("batch_diff_stats", { projectPath, commitHashes })
 }
 
-export function getRepoDiff(projectPath: string, commitHash: string): Promise<FileDiff[]> {
-  return invoke<FileDiff[]>("get_repo_diff", { projectPath, commitHash })
+export function getRangeDiff(
+  projectPath: string,
+  olderHash: string | null,
+  newerHash: string | null,
+): Promise<FileDiff[]> {
+  return invoke<FileDiff[]>("get_range_diff", { projectPath, olderHash, newerHash })
 }
 
 export function startWatching(projectPath: string): Promise<void> {

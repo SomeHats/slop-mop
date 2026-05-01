@@ -53,7 +53,7 @@ pub fn run() {
             commits::list_session_commits,
             window::open_project_window,
             diff::batch_diff_stats,
-            diff::get_repo_diff,
+            diff::get_range_diff,
             watcher::start_watching,
             watcher::stop_watching,
         ])

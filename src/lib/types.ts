@@ -20,6 +20,23 @@ export type SessionCommit = {
   timestamp_unix: number
 }
 
+/**
+ * An inclusive selection over the timeline, with each end being either a
+ * commit hash or `null` (the working tree / "Current Session" pseudo-node).
+ *
+ * Conventions:
+ *   - `older` and `newer` describe positions on the rail (older = lower in
+ *     the timeline). When both are commits, `older` is the older commit.
+ *   - `newer === null` means the selection extends through the working tree.
+ *   - Both `null` means workdir-only (diff HEAD vs working tree).
+ *   - The diff for a selection is `parent(older) → newer-or-workdir`. When
+ *     `older === null` the diff is `HEAD → workdir`.
+ */
+export type Selection = {
+  older: string | null
+  newer: string | null
+}
+
 export type DiffStats = {
   commit_hash: string
   additions: number

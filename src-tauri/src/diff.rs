@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use git2::{Delta, DiffFormat, DiffOptions, Repository};
+use git2::{Delta, DiffFormat, DiffOptions, Repository, Tree};
 use serde::Serialize;
 
 use crate::error::Error;
@@ -102,12 +102,70 @@ pub fn batch_diff_stats(
     Ok(results)
 }
 
+/// Resolve a commit's tree, returning Some(tree) (or None for a missing parent).
+fn commit_tree<'a>(repo: &'a Repository, hash: &str) -> Result<Tree<'a>, Error> {
+    let commit = repo
+        .revparse_single(hash)
+        .map_err(Error::Git)?
+        .peel_to_commit()
+        .map_err(Error::Git)?;
+    commit.tree().map_err(Error::Git)
+}
+
+/// Tree of the parent of a commit, or None if the commit is a root.
+fn parent_tree<'a>(repo: &'a Repository, hash: &str) -> Result<Option<Tree<'a>>, Error> {
+    let commit = repo
+        .revparse_single(hash)
+        .map_err(Error::Git)?
+        .peel_to_commit()
+        .map_err(Error::Git)?;
+    match commit.parent(0) {
+        Ok(parent) => Ok(Some(parent.tree().map_err(Error::Git)?)),
+        Err(_) => Ok(None),
+    }
+}
+
+fn head_tree(repo: &Repository) -> Result<Tree<'_>, Error> {
+    let head = repo.head().map_err(Error::Git)?;
+    head.peel_to_tree().map_err(Error::Git)
+}
+
+/// Diff over an inclusive range. `older_hash` is the older end of the
+/// selection (we include its contribution by diffing from its parent);
+/// `newer_hash` is the newer end (None means workdir + index).
+///
+/// Both None: workdir-only — diff HEAD vs working tree (live changes).
 #[tauri::command]
-pub fn get_repo_diff(project_path: String, commit_hash: String) -> Result<Vec<FileDiff>, Error> {
+pub fn get_range_diff(
+    project_path: String,
+    older_hash: Option<String>,
+    newer_hash: Option<String>,
+) -> Result<Vec<FileDiff>, Error> {
     let repo = Repository::discover(Path::new(&project_path))
         .map_err(|_| Error::NotAGitRepo(project_path.clone()))?;
 
-    let diff = diff_commit_vs_parent(&repo, &commit_hash)?;
+    let base_tree: Option<Tree<'_>> = match &older_hash {
+        Some(h) => parent_tree(&repo, h)?,
+        None => Some(head_tree(&repo)?),
+    };
+    let head_tree_opt: Option<Tree<'_>> = match &newer_hash {
+        Some(h) => Some(commit_tree(&repo, h)?),
+        None => None,
+    };
+
+    let mut opts = DiffOptions::new();
+    opts.include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .context_lines(100_000);
+
+    let diff = match head_tree_opt {
+        Some(ref new_tree) => repo
+            .diff_tree_to_tree(base_tree.as_ref(), Some(new_tree), Some(&mut opts))
+            .map_err(Error::Git)?,
+        None => repo
+            .diff_tree_to_workdir_with_index(base_tree.as_ref(), Some(&mut opts))
+            .map_err(Error::Git)?,
+    };
 
     let mut file_diffs: Vec<FileDiff> = Vec::new();
 

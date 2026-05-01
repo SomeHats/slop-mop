@@ -8,8 +8,9 @@ import { TerminalPanel } from "./features/terminal/terminal-panel"
 import { useClaudeSession } from "./hooks/use-claude-session"
 import { useDiffStats } from "./hooks/use-diff-stats"
 import { useFullscreen } from "./hooks/use-fullscreen"
-import { useRepoDiff } from "./hooks/use-repo-diff"
+import { useRangeDiff } from "./hooks/use-range-diff"
 import { startWatching } from "./lib/tauri"
+import type { Selection } from "./lib/types"
 
 const project = window.__PROJECT
 
@@ -44,23 +45,16 @@ function ProjectApp({
   fullscreen,
 }: ProjectAppProps): React.JSX.Element {
   const session = useClaudeSession(projectPath, projectId)
-  const [selectedHash, setSelectedHash] = useState<string | null>(null)
+  const [selection, setSelection] = useState<Selection | null>(null)
 
   useEffect(() => {
     void startWatching(projectPath)
   }, [projectPath])
 
   const diffStats = useDiffStats(projectPath, session.commits)
-  const selectedCommit =
-    selectedHash === null
-      ? null
-      : (session.commits.find((c) => c.commit_hash === selectedHash) ?? null)
-  const { fileDiffs, isLoading: isDiffLoading } = useRepoDiff(
-    projectPath,
-    selectedCommit?.commit_hash ?? null,
-  )
+  const { fileDiffs, isLoading: isDiffLoading } = useRangeDiff(projectPath, selection)
 
-  const showTerminal = selectedHash === null
+  const showTerminal = selection === null
   // The `claude --resume` picker doesn't offer a "start new session" option, so we
   // overlay our own button while the user hasn't picked a session yet. Once the
   // SessionStart hook fires (either pick from picker, or our restart-without-resume),
@@ -93,8 +87,8 @@ function ProjectApp({
         <ChatSidebar
           commits={session.commits}
           diffStats={diffStats}
-          selectedCommitHash={selectedHash}
-          onSelect={setSelectedHash}
+          selection={selection}
+          onSelect={setSelection}
           committing={session.isCommitting}
         />
         <div className="relative flex-1 overflow-hidden">
@@ -125,11 +119,7 @@ function ProjectApp({
           </div>
           {!showTerminal && (
             <div className="absolute inset-0 bg-background">
-              <DiffPanel
-                fileDiffs={fileDiffs}
-                isLoading={isDiffLoading}
-                selectedCommit={selectedCommit}
-              />
+              <DiffPanel fileDiffs={fileDiffs} isLoading={isDiffLoading} selection={selection} />
             </div>
           )}
         </div>
