@@ -158,13 +158,9 @@ export function ChatSidebar({
     // Defer single-click action so a double-click can pre-empt it.
     clickTimerRef.current = setTimeout(() => {
       clickTimerRef.current = null
-      if (key === null) {
-        // Click on Current Session = back to terminal.
-        onSelect(null)
-      } else {
-        // Click on a commit = from that commit through to the present.
-        onSelect({ older: key, newer: null })
-      }
+      // Click selects from this row through to the present (workdir).
+      // For Current Session that collapses to workdir-only.
+      onSelect({ older: key, newer: null })
     }, CLICK_DELAY_MS)
   }
 
@@ -320,13 +316,13 @@ function Row({
             )}
           />
         )}
-        {/* node — filled+purple when in range; on hover (only when not in
-            range) the border lights purple but the centre stays unfilled. */}
+        {/* node — filled+purple when in range; out-of-range hover lights
+            the border purple, in-range hover adds a soft purple halo. */}
         <span
           className={cn(
-            "absolute left-1/2 top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-colors",
+            "absolute left-1/2 top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-[border-color,box-shadow]",
             inRange
-              ? "border-purple-400 bg-purple-400"
+              ? "border-purple-400 bg-purple-400 group-hover:ring-2 group-hover:ring-purple-400/50"
               : "border-muted-foreground/60 bg-background group-hover:border-purple-400",
           )}
         />
