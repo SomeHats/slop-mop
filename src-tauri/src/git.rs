@@ -33,31 +33,57 @@ pub fn stage_all_and_check_dirty(cwd: &Path) -> Result<bool, String> {
     Ok(!diff.success())
 }
 
-/// Run `git commit --no-verify --no-gpg-sign --trailer "Creche-Session-Id=<id>" -m <subject>`.
-/// Caller is responsible for staging beforehand and confirming there are changes.
+/// Commit with a `Creche-Session-Id` trailer. Tries with the user's hooks
+/// first (so pre-commit formatters etc. run normally), and falls back to
+/// `--no-verify` if that fails — a hook is allowed to gate real commits but
+/// shouldn't block our checkpoints. Always passes `--no-gpg-sign` to avoid
+/// pinentry prompts we can't answer. Caller is responsible for staging.
 pub fn commit_with_session_trailer(
     cwd: &Path,
     session_id: &str,
     subject: &str,
 ) -> Result<(), String> {
     let trailer_arg = format!("{SESSION_TRAILER_KEY}={session_id}");
-    let out = Command::new("git")
-        .args([
-            "commit",
-            "--no-verify",
-            "--no-gpg-sign",
-            "--trailer",
-            &trailer_arg,
-            "-m",
-            subject,
-        ])
+    let base_args = [
+        "commit",
+        "--no-gpg-sign",
+        "--trailer",
+        &trailer_arg,
+        "-m",
+        subject,
+    ];
+
+    let first = Command::new("git")
+        .args(base_args)
         .current_dir(cwd)
         .output()
         .map_err(|e| format!("git commit: {e}"))?;
-    if !out.status.success() {
+    if first.status.success() {
+        return Ok(());
+    }
+    eprintln!(
+        "[git] commit with hooks failed (exit={:?}), retrying --no-verify: {}",
+        first.status.code(),
+        String::from_utf8_lossy(&first.stderr).trim()
+    );
+
+    // Re-stage in case the hook left files in a modified state, then retry.
+    let _ = Command::new("git")
+        .args(["add", "--all"])
+        .current_dir(cwd)
+        .status();
+
+    let mut retry_args: Vec<&str> = vec!["commit", "--no-verify"];
+    retry_args.extend_from_slice(&base_args[1..]);
+    let retry = Command::new("git")
+        .args(&retry_args)
+        .current_dir(cwd)
+        .output()
+        .map_err(|e| format!("git commit (retry): {e}"))?;
+    if !retry.status.success() {
         return Err(format!(
-            "git commit failed: {}",
-            String::from_utf8_lossy(&out.stderr)
+            "git commit failed even with --no-verify: {}",
+            String::from_utf8_lossy(&retry.stderr)
         ));
     }
     Ok(())
