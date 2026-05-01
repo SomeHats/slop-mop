@@ -181,29 +181,30 @@ export function ChatSidebar({
 
             if (row.key === null) {
               return (
-                <Row
-                  key="__current__"
-                  rowKey={null}
-                  isFirst={row.index === 0}
-                  isLast={row.index === lastRowIndex}
-                  inRange={inRange}
-                  aboveLit={aboveLit}
-                  belowLit={belowLit}
-                  onMouseDown={handleMouseDown}
-                  onMouseEnter={handleMouseEnter}
-                  onMouseUp={handleMouseUp}
-                  onClick={handleClick}
-                  onDoubleClick={handleDoubleClick}
-                >
-                  <Terminal className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="text-xs font-medium text-foreground">Current Session</span>
-                  {committing && (
-                    <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                      <Loader2 className="size-3 animate-spin" />
-                      committing…
-                    </span>
-                  )}
-                </Row>
+                <div key="__current__" className="sticky top-0 z-10 bg-background">
+                  <Row
+                    rowKey={null}
+                    isFirst={row.index === 0}
+                    isLast={row.index === lastRowIndex}
+                    inRange={inRange}
+                    aboveLit={aboveLit}
+                    belowLit={belowLit}
+                    onMouseDown={handleMouseDown}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseUp={handleMouseUp}
+                    onClick={handleClick}
+                    onDoubleClick={handleDoubleClick}
+                  >
+                    <Terminal className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="text-xs font-medium text-foreground">Current Session</span>
+                    {committing && (
+                      <span className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <Loader2 className="size-3 animate-spin" />
+                        committing…
+                      </span>
+                    )}
+                  </Row>
+                </div>
               )
             }
 
