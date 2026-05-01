@@ -196,9 +196,6 @@ export function ChatSidebar({
                   inRange={inRange}
                   aboveLit={aboveLit}
                   belowLit={belowLit}
-                  selected={
-                    selection !== null && selection.older === null && selection.newer === null
-                  }
                   onMouseDown={handleMouseDown}
                   onMouseEnter={handleMouseEnter}
                   onMouseUp={handleMouseUp}
@@ -220,9 +217,6 @@ export function ChatSidebar({
             const commit = commits[row.index - 1]
             if (!commit) return null
             const stats = diffStats.get(commit.commit_hash)
-            const selected =
-              selection !== null &&
-              (selection.older === commit.commit_hash || selection.newer === commit.commit_hash)
             return (
               <Row
                 key={commit.commit_hash}
@@ -232,7 +226,6 @@ export function ChatSidebar({
                 inRange={inRange}
                 aboveLit={aboveLit}
                 belowLit={belowLit}
-                selected={selected}
                 onMouseDown={handleMouseDown}
                 onMouseEnter={handleMouseEnter}
                 onMouseUp={handleMouseUp}
@@ -275,7 +268,6 @@ type RowProps = {
   inRange: boolean
   aboveLit: boolean
   belowLit: boolean
-  selected: boolean
   onMouseDown: (key: RowKey, e: React.MouseEvent) => void
   onMouseEnter: (key: RowKey, e: React.MouseEvent) => void
   onMouseUp: (key: RowKey) => void
@@ -291,7 +283,6 @@ function Row({
   inRange,
   aboveLit,
   belowLit,
-  selected,
   onMouseDown,
   onMouseEnter,
   onMouseUp,
@@ -307,10 +298,7 @@ function Row({
       onMouseUp={() => onMouseUp(rowKey)}
       onClick={() => onClick(rowKey)}
       onDoubleClick={() => onDoubleClick(rowKey)}
-      className={cn(
-        "flex w-full select-none items-stretch bg-background text-left transition-colors hover:bg-accent",
-        selected && "bg-accent",
-      )}
+      className="group flex w-full select-none items-stretch bg-background text-left"
     >
       {/* Rail column — borders never cross this so the line stays continuous. */}
       <div className="relative w-6 shrink-0">
@@ -332,13 +320,14 @@ function Row({
             )}
           />
         )}
-        {/* node */}
+        {/* node — filled+purple when in range; on hover (only when not in
+            range) the border lights purple but the centre stays unfilled. */}
         <span
           className={cn(
-            "absolute left-1/2 top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2",
+            "absolute left-1/2 top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-colors",
             inRange
               ? "border-purple-400 bg-purple-400"
-              : "border-muted-foreground/60 bg-background",
+              : "border-muted-foreground/60 bg-background group-hover:border-purple-400",
           )}
         />
       </div>
