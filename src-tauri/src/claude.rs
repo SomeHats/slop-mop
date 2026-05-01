@@ -7,17 +7,15 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
-use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
-use portable_pty::{CommandBuilder, PtySize, native_pty_system};
+use base64::Engine as _;
+use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tiny_http::{Method, Response, Server};
 
 use crate::error::Error;
-use crate::git::{
-    commit_with_session_trailer, get_head_commit_hash, stage_all_and_check_dirty,
-};
+use crate::git::{commit_with_session_trailer, get_head_commit_hash, stage_all_and_check_dirty};
 
 /// Resolve the user's login-shell PATH once. macOS GUI apps launched from
 /// Finder otherwise get a minimal PATH that won't include brew/nvm/etc.
@@ -148,15 +146,13 @@ pub fn spawn_claude(
 
     // 2. Write temp settings.json with UserPromptSubmit + SessionStart hooks.
     let settings_path = std::env::temp_dir().join(format!("claude-creche-{agent_id}.json"));
-    let prompt_hook_url = format!(
-        "http://127.0.0.1:{hook_port}/prompt?project_id={project_id}&agent_id={agent_id}"
-    );
+    let prompt_hook_url =
+        format!("http://127.0.0.1:{hook_port}/prompt?project_id={project_id}&agent_id={agent_id}");
     let session_hook_url = format!(
         "http://127.0.0.1:{hook_port}/session-start?project_id={project_id}&agent_id={agent_id}"
     );
-    let stop_hook_url = format!(
-        "http://127.0.0.1:{hook_port}/stop?project_id={project_id}&agent_id={agent_id}"
-    );
+    let stop_hook_url =
+        format!("http://127.0.0.1:{hook_port}/stop?project_id={project_id}&agent_id={agent_id}");
     let settings_json = serde_json::json!({
         "hooks": {
             "UserPromptSubmit": [
@@ -213,9 +209,7 @@ pub fn spawn_claude(
 
     // 3. Resolve the `claude` binary.
     let claude_bin = find_claude().ok_or_else(|| {
-        Error::AgentSpawnFailed(
-            "`claude` CLI not found on PATH. Install Claude Code first.".into(),
-        )
+        Error::AgentSpawnFailed("`claude` CLI not found on PATH. Install Claude Code first.".into())
     })?;
 
     // 4. Open PTY and spawn `claude --settings <file>`.
@@ -420,7 +414,12 @@ struct CommitStatusEvent {
     agent_id: String,
 }
 
-fn emit_to_window<S: Serialize + Clone>(app: &AppHandle, window_label: &str, event: &str, payload: S) {
+fn emit_to_window<S: Serialize + Clone>(
+    app: &AppHandle,
+    window_label: &str,
+    event: &str,
+    payload: S,
+) {
     for (_, w) in app.webview_windows() {
         if w.label() == window_label {
             let _ = w.emit(event, payload);
@@ -496,12 +495,7 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
 
 /// UserPromptSubmit: stash the prompt for the upcoming Stop, and commit any
 /// pre-existing uncommitted work as a "check point" so Claude's diff is clean.
-fn handle_prompt(
-    app: &AppHandle,
-    window_label: &str,
-    agent_id: &str,
-    parsed: &serde_json::Value,
-) {
+fn handle_prompt(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &serde_json::Value) {
     let session_id = parsed
         .get("session_id")
         .and_then(|v| v.as_str())
@@ -546,7 +540,9 @@ fn handle_prompt(
     match stage_all_and_check_dirty(path) {
         Ok(false) => eprintln!("[hook] checkpoint skipped (clean tree)"),
         Ok(true) => {
-            let payload = CommitStatusEvent { agent_id: agent_id.to_string() };
+            let payload = CommitStatusEvent {
+                agent_id: agent_id.to_string(),
+            };
             emit_to_window(app, window_label, "commit-started", payload.clone());
             match commit_with_session_trailer(path, &session_id, "check point") {
                 Ok(()) => eprintln!("[hook] checkpoint committed"),
@@ -559,12 +555,7 @@ fn handle_prompt(
 }
 
 /// Stop: commit Claude's changes (if any) with the prompt as the message.
-fn handle_stop(
-    app: &AppHandle,
-    window_label: &str,
-    agent_id: &str,
-    parsed: &serde_json::Value,
-) {
+fn handle_stop(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &serde_json::Value) {
     let session_id = parsed
         .get("session_id")
         .and_then(|v| v.as_str())
@@ -601,7 +592,9 @@ fn handle_stop(
         return;
     }
 
-    let status_payload = CommitStatusEvent { agent_id: agent_id.to_string() };
+    let status_payload = CommitStatusEvent {
+        agent_id: agent_id.to_string(),
+    };
     emit_to_window(app, window_label, "commit-started", status_payload.clone());
 
     // Ask claude -p to generate a commit message from the staged diff. Fall
@@ -664,7 +657,7 @@ fn first_line(s: &str) -> String {
 /// its own bash tool. Returns the trimmed stdout (multi-line OK — first line
 /// is the subject, rest is the body).
 fn generate_commit_message(cwd: &std::path::Path) -> Result<String, String> {
-    let prompt = "Inspect the staged git changes (e.g. `git diff --cached`) and write a concise commit message for them. Output ONLY the commit message text — no markdown fencing, no quoting, no preamble. The first line must be a short subject in imperative mood under 70 chars; you may follow it with a blank line and a brief body.";
+    let prompt = "Inspect the staged git changes (e.g. `git diff --cached`) and write a concise commit message for them. Output ONLY the commit message text — no markdown fencing, no quoting, no preamble. The first line must be a short subject in imperative mood under 70 chars; you may follow it with a blank line and a brief body. Do not use any sort of prefix to your commit message.";
     let out = Command::new("claude")
         .args(["-p", prompt])
         .current_dir(cwd)
@@ -700,9 +693,7 @@ fn handle_session_start(
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string();
-    eprintln!(
-        "[hook] session-start agent_id={agent_id} session_id={session_id} source={source}"
-    );
+    eprintln!("[hook] session-start agent_id={agent_id} session_id={session_id} source={source}");
     if session_id.is_empty() {
         return;
     }
@@ -751,10 +742,9 @@ fn url_decode(s: &str) -> String {
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(b) = u8::from_str_radix(
-                std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""),
-                16,
-            ) {
+            if let Ok(b) =
+                u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""), 16)
+            {
                 out.push(b as char);
                 i += 3;
                 continue;
@@ -769,4 +759,3 @@ fn url_decode(s: &str) -> String {
     }
     out
 }
-
