@@ -601,10 +601,23 @@ fn handle_stop(
         return;
     }
 
-    let subject = first_line(&prompt);
     let status_payload = CommitStatusEvent { agent_id: agent_id.to_string() };
     emit_to_window(app, window_label, "commit-started", status_payload.clone());
-    let commit_result = commit_with_session_trailer(path, &session_id, &subject);
+
+    // Ask claude -p to generate a commit message from the staged diff. Fall
+    // back to the prompt's first line if it fails (network/auth/etc.) so the
+    // user never loses a commit.
+    let generated = match generate_commit_message(path) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("[hook] stop: claude -p failed, falling back to prompt: {e}");
+            first_line(&prompt)
+        }
+    };
+    let full_message = format!("{generated}\n\nPrompt: {prompt}");
+    let subject = first_line(&generated);
+
+    let commit_result = commit_with_session_trailer(path, &session_id, &full_message);
     emit_to_window(app, window_label, "commit-finished", status_payload);
     if let Err(e) = commit_result {
         eprintln!("[hook] stop commit failed: {e}");
@@ -644,6 +657,31 @@ fn take_pending_prompt(app: &AppHandle, agent_id: &str) -> Option<String> {
 
 fn first_line(s: &str) -> String {
     s.lines().next().unwrap_or("").trim().to_string()
+}
+
+/// Shell out to `claude -p` to generate a commit message for the currently
+/// staged changes. Runs in the project cwd so claude can inspect the diff via
+/// its own bash tool. Returns the trimmed stdout (multi-line OK — first line
+/// is the subject, rest is the body).
+fn generate_commit_message(cwd: &std::path::Path) -> Result<String, String> {
+    let prompt = "Inspect the staged git changes (e.g. `git diff --cached`) and write a concise commit message for them. Output ONLY the commit message text — no markdown fencing, no quoting, no preamble. The first line must be a short subject in imperative mood under 70 chars; you may follow it with a blank line and a brief body.";
+    let out = Command::new("claude")
+        .args(["-p", prompt])
+        .current_dir(cwd)
+        .output()
+        .map_err(|e| format!("spawn claude -p: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "claude -p exit={:?} stderr={}",
+            out.status.code(),
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    let msg = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if msg.is_empty() {
+        return Err("claude -p returned empty output".to_string());
+    }
+    Ok(msg)
 }
 
 fn handle_session_start(

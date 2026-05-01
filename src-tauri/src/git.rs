@@ -41,7 +41,7 @@ pub fn stage_all_and_check_dirty(cwd: &Path) -> Result<bool, String> {
 pub fn commit_with_session_trailer(
     cwd: &Path,
     session_id: &str,
-    subject: &str,
+    message: &str,
 ) -> Result<(), String> {
     let trailer_arg = format!("{SESSION_TRAILER_KEY}={session_id}");
     let base_args = [
@@ -50,7 +50,7 @@ pub fn commit_with_session_trailer(
         "--trailer",
         &trailer_arg,
         "-m",
-        subject,
+        message,
     ];
 
     let first = Command::new("git")
