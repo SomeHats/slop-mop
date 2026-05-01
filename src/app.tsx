@@ -119,7 +119,12 @@ function ProjectApp({
           </div>
           {!showTerminal && (
             <div className="absolute inset-0 bg-background">
-              <DiffPanel fileDiffs={fileDiffs} isLoading={isDiffLoading} selection={selection} />
+              <DiffPanel
+                fileDiffs={fileDiffs}
+                isLoading={isDiffLoading}
+                selection={selection}
+                commits={session.commits}
+              />
             </div>
           )}
         </div>
