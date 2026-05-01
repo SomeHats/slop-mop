@@ -662,9 +662,12 @@ fn first_line(s: &str) -> String {
 /// is the subject, rest is the body).
 fn generate_commit_message(cwd: &std::path::Path) -> Result<String, String> {
     let prompt = "Inspect the staged git changes (e.g. `git diff --cached`) and write a concise commit message for them. Output ONLY the commit message text — no markdown fencing, no quoting, no preamble. The first line must be a short subject in imperative mood under 70 chars; you may follow it with a blank line and a brief body. Do not use any sort of prefix to your commit message.";
+    // Bundled .app's inherited PATH is minimal — fall back to shell_path()
+    // so we can find `claude` the same way the PTY spawn does.
     let out = Command::new("claude")
         .args(["-p", prompt])
         .current_dir(cwd)
+        .env("PATH", shell_path())
         .output()
         .map_err(|e| format!("spawn claude -p: {e}"))?;
     if !out.status.success() {
