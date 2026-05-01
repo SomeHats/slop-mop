@@ -51,6 +51,14 @@ function ProjectApp({
     void startWatching(projectPath)
   }, [projectPath])
 
+  // When the Stop hook lands a new commit, jump straight into its diff so the
+  // user sees what just changed instead of staring at a now-stale terminal.
+  useEffect(() => {
+    return session.onCommitLanded((commit) => {
+      setSelection({ older: commit.commit_hash, newer: commit.commit_hash })
+    })
+  }, [session.onCommitLanded])
+
   const diffStats = useDiffStats(projectPath, session.commits)
   const { fileDiffs, isLoading: isDiffLoading } = useRangeDiff(projectPath, selection)
 

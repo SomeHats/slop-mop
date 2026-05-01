@@ -31,6 +31,8 @@ export type ClaudeSession = {
   resize: (cols: number, rows: number) => void
   /** Kill the current process and respawn. `resume:false` skips the picker. */
   restart: (opts: { resume: boolean }) => void
+  /** Subscribe to commits as they land via the Stop hook (not the initial seed). */
+  onCommitLanded: (listener: (commit: SessionCommit) => void) => () => void
 }
 
 function decodeBase64(data: string): Uint8Array {
@@ -63,6 +65,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
 
   const agentIdRef = useRef<string | null>(null)
   const outputListenersRef = useRef<Set<(b: Uint8Array) => void>>(new Set())
+  const commitListenersRef = useRef<Set<(c: SessionCommit) => void>>(new Set())
 
   useEffect(() => {
     let cancelled = false
@@ -131,16 +134,15 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
         }>("prompt-committed", (evt) => {
           if (evt.payload.agent_id !== agentIdRef.current) return
           console.log("[creche] prompt-committed", evt.payload)
+          const commit: SessionCommit = {
+            commit_hash: evt.payload.commit_hash,
+            session_id: evt.payload.session_id,
+            prompt: evt.payload.prompt,
+            timestamp_unix: evt.payload.timestamp_unix,
+          }
           // git2 walks newest-first from HEAD, so prepend.
-          setCommits((prev) => [
-            {
-              commit_hash: evt.payload.commit_hash,
-              session_id: evt.payload.session_id,
-              prompt: evt.payload.prompt,
-              timestamp_unix: evt.payload.timestamp_unix,
-            },
-            ...prev,
-          ])
+          setCommits((prev) => [commit, ...prev])
+          for (const fn of commitListenersRef.current) fn(commit)
         })
         unlisteners.push(committedUnlisten)
 
@@ -168,6 +170,13 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     outputListenersRef.current.add(listener)
     return () => {
       outputListenersRef.current.delete(listener)
+    }
+  }, [])
+
+  const onCommitLanded = useCallback((listener: (commit: SessionCommit) => void): (() => void) => {
+    commitListenersRef.current.add(listener)
+    return () => {
+      commitListenersRef.current.delete(listener)
     }
   }, [])
 
@@ -207,5 +216,6 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     writeInput,
     resize,
     restart,
+    onCommitLanded,
   }
 }
