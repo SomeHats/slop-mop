@@ -3,7 +3,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -17,33 +17,25 @@ use tiny_http::{Method, Response, Server};
 use crate::error::Error;
 use crate::git::{commit_with_session_trailer, get_head_commit_hash, stage_all_and_check_dirty};
 
-/// Resolve the user's login-shell PATH once. macOS GUI apps launched from
-/// Finder otherwise get a minimal PATH that won't include brew/nvm/etc.
-fn shell_path() -> &'static str {
-    static PATH: OnceLock<String> = OnceLock::new();
-    PATH.get_or_init(|| {
-        let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-        Command::new(&shell)
-            .args(["-ilc", "echo $PATH"])
-            .stderr(std::process::Stdio::null())
-            .output()
-            .ok()
-            .and_then(|o| String::from_utf8(o.stdout).ok())
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| std::env::var("PATH").unwrap_or_default())
-    })
+/// The user's login shell, falling back to zsh.
+fn user_shell() -> String {
+    std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string())
 }
 
-/// Find `claude` on the shell PATH.
-fn find_claude() -> Option<PathBuf> {
-    for dir in shell_path().split(':') {
-        let candidate = PathBuf::from(dir).join("claude");
-        if candidate.exists() {
-            return Some(candidate);
+/// Wrap a string in single quotes for safe inclusion in a shell command line.
+/// Embedded single quotes become `'\''` (close-quote, escaped quote, open-quote).
+fn shell_quote(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for c in s.chars() {
+        if c == '\'' {
+            out.push_str("'\\''");
+        } else {
+            out.push(c);
         }
     }
-    None
+    out.push('\'');
+    out
 }
 
 pub struct ClaudeProcess {
@@ -207,12 +199,10 @@ pub fn spawn_claude(
     eprintln!("[claude] session-start hook: {session_hook_url}");
     eprintln!("[claude] stop hook: {stop_hook_url}");
 
-    // 3. Resolve the `claude` binary.
-    let claude_bin = find_claude().ok_or_else(|| {
-        Error::AgentSpawnFailed("`claude` CLI not found on PATH. Install Claude Code first.".into())
-    })?;
-
-    // 4. Open PTY and spawn `claude --settings <file>`.
+    // 3. Open PTY and spawn `claude` through the user's login+interactive shell
+    //    so we inherit their full env (PATH, nvm/fnm/mise, exported secrets,
+    //    etc.). `exec` makes claude replace the shell process so signals and
+    //    TTY ownership flow naturally.
     let pty_system = native_pty_system();
     let pair = pty_system
         .openpty(PtySize {
@@ -223,14 +213,16 @@ pub fn spawn_claude(
         })
         .map_err(|e| Error::AgentSpawnFailed(format!("openpty failed: {e}")))?;
 
-    let mut cmd = CommandBuilder::new(&claude_bin);
-    cmd.arg("--settings");
-    cmd.arg(&settings_path);
+    let settings_arg = shell_quote(&settings_path.to_string_lossy());
+    let mut shell_cmd = format!("exec claude --settings {settings_arg}");
     if resume {
-        cmd.arg("--resume");
+        shell_cmd.push_str(" --resume");
     }
+
+    let mut cmd = CommandBuilder::new(user_shell());
+    cmd.arg("-ilc");
+    cmd.arg(&shell_cmd);
     cmd.cwd(&project_path);
-    cmd.env("PATH", shell_path());
     cmd.env("TERM", "xterm-256color");
     // Pin truecolor so claude emits 24-bit RGB SGRs regardless of how the app
     // was launched. Without this, a bundled .app inherits an empty COLORTERM
@@ -662,12 +654,13 @@ fn first_line(s: &str) -> String {
 /// is the subject, rest is the body).
 fn generate_commit_message(cwd: &std::path::Path) -> Result<String, String> {
     let prompt = "Inspect the staged git changes (e.g. `git diff --cached`) and write a concise commit message for them. Output ONLY the commit message text — no markdown fencing, no quoting, no preamble. The first line must be a short subject in imperative mood under 70 chars; you may follow it with a blank line and a brief body. Do not use any sort of prefix to your commit message.";
-    // Bundled .app's inherited PATH is minimal — fall back to shell_path()
-    // so we can find `claude` the same way the PTY spawn does.
-    let out = Command::new("claude")
-        .args(["-p", prompt])
+    // Route through the user's shell so we get their full env (PATH, node
+    // version manager shims, exported credentials, etc.) — the bundled .app
+    // otherwise inherits a minimal PATH from launchd.
+    let shell_cmd = format!("exec claude -p {}", shell_quote(prompt));
+    let out = Command::new(user_shell())
+        .args(["-ilc", &shell_cmd])
         .current_dir(cwd)
-        .env("PATH", shell_path())
         .output()
         .map_err(|e| format!("spawn claude -p: {e}"))?;
     if !out.status.success() {
