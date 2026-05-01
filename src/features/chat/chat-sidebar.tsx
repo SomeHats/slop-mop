@@ -158,9 +158,13 @@ export function ChatSidebar({
     // Defer single-click action so a double-click can pre-empt it.
     clickTimerRef.current = setTimeout(() => {
       clickTimerRef.current = null
-      // Click selects from this row through to the present (workdir).
-      // For Current Session that collapses to workdir-only.
-      onSelect({ older: key, newer: null })
+      if (key === null) {
+        // Click on Current Session = back to the terminal (no diff).
+        onSelect(null)
+      } else {
+        // Click on a commit = from that commit through to the present.
+        onSelect({ older: key, newer: null })
+      }
     }, CLICK_DELAY_MS)
   }
 
@@ -178,7 +182,11 @@ export function ChatSidebar({
       <ScrollArea className="min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:!block">
         <div className="flex w-full flex-col">
           {rows.map((row) => {
-            const inRange = isInRange(row.index)
+            // No selection at all = "back to terminal" state, which we
+            // represent visually by lighting the Current Session node.
+            const isCurrent = row.key === null
+            const inRange =
+              isInRange(row.index) || (selection === null && isCurrent)
             const aboveLit = inRange && isInRange(row.index - 1)
             const belowLit = inRange && isInRange(row.index + 1)
 
