@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Separator } from "@/components/ui/separator"
-import { ChatSidebar, CURRENT_SESSION_ID } from "./features/chat/chat-sidebar"
+import { ChatSidebar } from "./features/chat/chat-sidebar"
 import { DiffPanel } from "./features/diff/diff-panel"
 import { ProjectPicker } from "./features/projects/project-picker"
 import { TerminalPanel } from "./features/terminal/terminal-panel"
@@ -43,7 +43,7 @@ function ProjectApp({
   fullscreen,
 }: ProjectAppProps): React.JSX.Element {
   const session = useClaudeSession(projectPath, projectId)
-  const [selectedId, setSelectedId] = useState<string>(CURRENT_SESSION_ID)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   useEffect(() => {
     void startWatching(projectPath)
@@ -51,15 +51,13 @@ function ProjectApp({
 
   const diffStats = useDiffStats(projectPath, session.snapshots)
   const selectedSnapshot =
-    selectedId === CURRENT_SESSION_ID
-      ? null
-      : (session.snapshots.find((s) => s.id === selectedId) ?? null)
+    selectedId === null ? null : (session.snapshots.find((s) => s.id === selectedId) ?? null)
   const { fileDiffs, isLoading: isDiffLoading } = useRepoDiff(
     projectPath,
     selectedSnapshot?.commit_hash ?? null,
   )
 
-  const showTerminal = selectedId === CURRENT_SESSION_ID
+  const showTerminal = selectedId === null
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">

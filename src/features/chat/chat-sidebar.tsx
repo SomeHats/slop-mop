@@ -1,16 +1,14 @@
-import { Terminal } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { DiffStats, PromptSnapshot } from "@/lib/types"
 import { cn } from "@/lib/utils"
-
-export const CURRENT_SESSION_ID = "__current_session__"
+import { CurrentSessionEntry } from "./current-session-entry"
 
 type ChatSidebarProps = {
   snapshots: PromptSnapshot[]
   diffStats: Map<string, DiffStats>
   selectedSnapshotId: string | null
-  onSelect: (id: string) => void
+  onSelect: (id: string | null) => void
 }
 
 function formatTime(iso: string): string {
@@ -26,24 +24,11 @@ export function ChatSidebar({
   selectedSnapshotId,
   onSelect,
 }: ChatSidebarProps): React.JSX.Element {
-  const currentSelected = selectedSnapshotId === CURRENT_SESSION_ID
-
   return (
     <div className="flex w-80 flex-col overflow-hidden border-r border-border bg-background">
+      <CurrentSessionEntry selected={selectedSnapshotId === null} onSelect={() => onSelect(null)} />
       <ScrollArea className="min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:!block">
         <div className="flex w-full flex-col">
-          <button
-            type="button"
-            onClick={() => onSelect(CURRENT_SESSION_ID)}
-            className={cn(
-              "flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left transition-colors hover:bg-accent",
-              currentSelected && "bg-accent",
-            )}
-          >
-            <Terminal className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="text-xs font-medium text-foreground">Current Session</span>
-          </button>
-
           {snapshots.length === 0 ? (
             <p className="px-3 py-4 text-xs text-muted-foreground">No prompts yet.</p>
           ) : (

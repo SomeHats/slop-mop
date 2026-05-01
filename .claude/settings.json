@@ -1,0 +1,5 @@
+{
+  "autoMode": {
+    "environment": ["$defaults", "Source control: allow committing to main"]
+  }
+}
