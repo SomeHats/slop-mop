@@ -308,18 +308,18 @@ function Row({
       onClick={() => onClick(rowKey)}
       onDoubleClick={() => onDoubleClick(rowKey)}
       className={cn(
-        "flex w-full select-none items-stretch border-b border-border bg-background text-left transition-colors hover:bg-accent",
+        "flex w-full select-none items-stretch bg-background text-left transition-colors hover:bg-accent",
         selected && "bg-accent",
       )}
     >
-      {/* Rail column */}
+      {/* Rail column — borders never cross this so the line stays continuous. */}
       <div className="relative w-6 shrink-0">
         {/* top half-line */}
         {!isFirst && (
           <span
             className={cn(
               "absolute left-1/2 top-0 h-1/2 w-[2px] -translate-x-1/2",
-              aboveLit ? "bg-primary" : "bg-muted-foreground/60",
+              aboveLit ? "bg-purple-400" : "bg-muted-foreground/60",
             )}
           />
         )}
@@ -328,7 +328,7 @@ function Row({
           <span
             className={cn(
               "absolute left-1/2 top-1/2 h-1/2 w-[2px] -translate-x-1/2",
-              belowLit ? "bg-primary" : "bg-muted-foreground/60",
+              belowLit ? "bg-purple-400" : "bg-muted-foreground/60",
             )}
           />
         )}
@@ -336,11 +336,20 @@ function Row({
         <span
           className={cn(
             "absolute left-1/2 top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2",
-            inRange ? "border-primary bg-primary" : "border-muted-foreground/60 bg-background",
+            inRange
+              ? "border-purple-400 bg-purple-400"
+              : "border-muted-foreground/60 bg-background",
           )}
         />
       </div>
-      <div className="flex flex-1 items-center gap-2 px-3 py-2 min-w-0">{children}</div>
+      <div
+        className={cn(
+          "flex flex-1 min-w-0 items-center gap-2 py-2 pl-1.5 pr-3",
+          !isFirst && "border-t border-border",
+        )}
+      >
+        {children}
+      </div>
     </button>
   )
 }
