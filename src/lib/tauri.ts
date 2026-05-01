@@ -21,8 +21,12 @@ export type SpawnClaudeResult = {
   agent_id: string
 }
 
-export function spawnClaude(projectPath: string, projectId: string): Promise<SpawnClaudeResult> {
-  return invoke<SpawnClaudeResult>("spawn_claude", { projectPath, projectId })
+export function spawnClaude(
+  projectPath: string,
+  projectId: string,
+  resume: boolean,
+): Promise<SpawnClaudeResult> {
+  return invoke<SpawnClaudeResult>("spawn_claude", { projectPath, projectId, resume })
 }
 
 export function writeClaudeStdin(agentId: string, data: string): Promise<void> {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { ChatSidebar } from "./features/chat/chat-sidebar"
 import { DiffPanel } from "./features/diff/diff-panel"
@@ -58,6 +59,12 @@ function ProjectApp({
   )
 
   const showTerminal = selectedId === null
+  // The `claude --resume` picker doesn't offer a "start new session" option, so we
+  // overlay our own button while the user hasn't picked a session yet. Once the
+  // SessionStart hook fires (either pick from picker, or our restart-without-resume),
+  // sessionId is non-null and the button hides.
+  const showNewSessionButton =
+    showTerminal && session.resumeMode && session.sessionId === null && !session.isConnecting
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -92,12 +99,26 @@ function ProjectApp({
               internal buffer isn't clobbered by 0x0 resize events when we
               navigate away. When covered, `inert` removes it from the focus +
               pointer-event tree. */}
-          <div className="absolute inset-0" inert={!showTerminal} aria-hidden={!showTerminal}>
-            <TerminalPanel
-              key={session.agentId ?? "pending"}
-              session={session}
-              visible={showTerminal}
-            />
+          <div
+            className="absolute inset-0 flex flex-col"
+            inert={!showTerminal}
+            aria-hidden={!showTerminal}
+          >
+            {showNewSessionButton && (
+              <div className="flex flex-col items-center gap-2 border-b border-border bg-background px-4 py-4">
+                <Button size="sm" onClick={() => session.restart({ resume: false })}>
+                  New session
+                </Button>
+                <p className="text-xs text-muted-foreground">Or, resume an existing session:</p>
+              </div>
+            )}
+            <div className="min-h-0 flex-1">
+              <TerminalPanel
+                key={session.agentId ?? "pending"}
+                session={session}
+                visible={showTerminal}
+              />
+            </div>
           </div>
           {!showTerminal && (
             <div className="absolute inset-0 bg-background">

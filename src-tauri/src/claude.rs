@@ -54,6 +54,9 @@ pub struct ClaudeProcess {
     child: Arc<Mutex<Box<dyn portable_pty::Child + Send + Sync>>>,
     settings_path: PathBuf,
     hook_server: Arc<Server>,
+    /// The Claude session id, captured when the SessionStart hook fires. None
+    /// while the user is sitting in the `--resume` picker (no session active yet).
+    session_id: Arc<Mutex<Option<String>>>,
 }
 
 pub struct ClaudeManager(pub Mutex<HashMap<String, ClaudeProcess>>);
@@ -101,6 +104,14 @@ struct ClaudeExitEvent {
     agent_id: String,
 }
 
+#[derive(Clone, Serialize)]
+struct SessionStartedEvent {
+    agent_id: String,
+    session_id: String,
+    /// "startup" | "resume" | "clear" | "compact" — passed through from Claude.
+    source: String,
+}
+
 #[derive(Serialize)]
 pub struct SpawnClaudeResult {
     pub agent_id: String,
@@ -113,6 +124,7 @@ pub fn spawn_claude(
     manager: State<'_, ClaudeManager>,
     project_path: String,
     project_id: String,
+    resume: bool,
 ) -> Result<SpawnClaudeResult, Error> {
     // Clean up any prior process for this window (frontend reload safety).
     manager.kill_for_window(window.label());
@@ -129,10 +141,13 @@ pub fn spawn_claude(
         .port();
     let server = Arc::new(server);
 
-    // 2. Write temp settings.json with the UserPromptSubmit hook.
+    // 2. Write temp settings.json with UserPromptSubmit + SessionStart hooks.
     let settings_path = std::env::temp_dir().join(format!("claude-creche-{agent_id}.json"));
-    let hook_url = format!(
+    let prompt_hook_url = format!(
         "http://127.0.0.1:{hook_port}/prompt?project_id={project_id}&agent_id={agent_id}"
+    );
+    let session_hook_url = format!(
+        "http://127.0.0.1:{hook_port}/session-start?project_id={project_id}&agent_id={agent_id}"
     );
     let settings_json = serde_json::json!({
         "hooks": {
@@ -142,7 +157,19 @@ pub fn spawn_claude(
                         {
                             "type": "command",
                             "command": format!(
-                                "curl -sS --max-time 30 -X POST '{hook_url}' --data-binary @-"
+                                "curl -sS --max-time 30 -X POST '{prompt_hook_url}' --data-binary @-"
+                            )
+                        }
+                    ]
+                }
+            ],
+            "SessionStart": [
+                {
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": format!(
+                                "curl -sS --max-time 5 -X POST '{session_hook_url}' --data-binary @-"
                             )
                         }
                     ]
@@ -157,10 +184,11 @@ pub fn spawn_claude(
     .map_err(|e| Error::AgentSpawnFailed(format!("writing settings.json failed: {e}")))?;
 
     eprintln!(
-        "[claude] spawn agent_id={agent_id} hook_port={hook_port} settings={}",
+        "[claude] spawn agent_id={agent_id} hook_port={hook_port} resume={resume} settings={}",
         settings_path.display()
     );
-    eprintln!("[claude] hook url: {hook_url}");
+    eprintln!("[claude] prompt hook: {prompt_hook_url}");
+    eprintln!("[claude] session-start hook: {session_hook_url}");
 
     // 3. Resolve the `claude` binary.
     let claude_bin = find_claude().ok_or_else(|| {
@@ -183,6 +211,9 @@ pub fn spawn_claude(
     let mut cmd = CommandBuilder::new(&claude_bin);
     cmd.arg("--settings");
     cmd.arg(&settings_path);
+    if resume {
+        cmd.arg("--resume");
+    }
     cmd.cwd(&project_path);
     cmd.env("PATH", shell_path());
     cmd.env("TERM", "xterm-256color");
@@ -242,6 +273,8 @@ pub fn spawn_claude(
         });
     }
 
+    let session_id = Arc::new(Mutex::new(None::<String>));
+
     // 6. Hook listener thread.
     {
         let app = app.clone();
@@ -257,6 +290,7 @@ pub fn spawn_claude(
         child,
         settings_path,
         hook_server: server,
+        session_id,
     };
 
     manager
@@ -381,9 +415,9 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
         return;
     }
 
-    // Parse project_id/agent_id from query string of the URL path.
     let url = req.url().to_string();
-    let (project_id, _agent_id) = parse_query(&url);
+    let path = url.split('?').next().unwrap_or("").to_string();
+    let (project_id, agent_id) = parse_query(&url);
 
     let mut body = String::new();
     if let Err(e) = req.as_reader().read_to_string(&mut body) {
@@ -391,9 +425,8 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
         let _ = req.respond(Response::from_string("").with_status_code(200));
         return;
     }
-    eprintln!("[hook] body_bytes={}", body.len());
+    eprintln!("[hook] path={path} body_bytes={}", body.len());
 
-    // Hook JSON looks like { session_id, prompt, cwd, ... }.
     let parsed: serde_json::Value = match serde_json::from_str(&body) {
         Ok(v) => v,
         Err(e) => {
@@ -403,6 +436,23 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
         }
     };
 
+    match path.as_str() {
+        "/prompt" => handle_prompt(app, window_label, &project_id, &parsed, t_start),
+        "/session-start" => handle_session_start(app, window_label, &agent_id, &parsed),
+        other => eprintln!("[hook] unknown path: {other}"),
+    }
+
+    let _ = req.respond(Response::from_string("").with_status_code(200));
+    eprintln!("[hook] responded 200 ({:?} total)", t_start.elapsed());
+}
+
+fn handle_prompt(
+    app: &AppHandle,
+    window_label: &str,
+    project_id: &str,
+    parsed: &serde_json::Value,
+    t_start: std::time::Instant,
+) {
     let session_id = parsed
         .get("session_id")
         .and_then(|v| v.as_str())
@@ -419,24 +469,69 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
         .map(PathBuf::from);
 
     eprintln!(
-        "[hook] parsed project_id={project_id} session_id={session_id} prompt_len={} cwd={:?}",
+        "[hook] prompt project_id={project_id} session_id={session_id} prompt_len={} cwd={:?}",
         prompt.len(),
         cwd
     );
 
-    // Best-effort: commit + record snapshot. If anything fails, still respond 200 so the
-    // prompt proceeds — we never want the hook to block the user.
+    // Best-effort: commit + record snapshot. If anything fails, still respond 200
+    // so the prompt proceeds — we never want the hook to block the user.
     if let Some(path) = cwd.as_deref() {
-        match commit_and_record(app, window_label, &project_id, &session_id, &prompt, path) {
+        match commit_and_record(app, window_label, project_id, &session_id, &prompt, path) {
             Ok(()) => eprintln!("[hook] commit_and_record ok ({:?})", t_start.elapsed()),
             Err(e) => eprintln!("[hook] commit_and_record failed: {e}"),
         }
     } else {
         eprintln!("[hook] missing cwd in hook payload");
     }
+}
 
-    let _ = req.respond(Response::from_string("").with_status_code(200));
-    eprintln!("[hook] responded 200 ({:?} total)", t_start.elapsed());
+fn handle_session_start(
+    app: &AppHandle,
+    window_label: &str,
+    agent_id: &str,
+    parsed: &serde_json::Value,
+) {
+    let session_id = parsed
+        .get("session_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let source = parsed
+        .get("source")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    eprintln!(
+        "[hook] session-start agent_id={agent_id} session_id={session_id} source={source}"
+    );
+    if session_id.is_empty() {
+        return;
+    }
+
+    // Persist the session id on the matching ClaudeProcess.
+    if let Some(manager) = app.try_state::<ClaudeManager>() {
+        if let Ok(procs) = manager.0.lock() {
+            if let Some(p) = procs.get(agent_id) {
+                if let Ok(mut s) = p.session_id.lock() {
+                    *s = Some(session_id.clone());
+                }
+            }
+        }
+    }
+
+    // Notify the project window so the UI can hide the "New session" overlay.
+    let event = SessionStartedEvent {
+        agent_id: agent_id.to_string(),
+        session_id,
+        source,
+    };
+    for (_, w) in app.webview_windows() {
+        if w.label() == window_label {
+            let _ = w.emit("session-started", event.clone());
+            break;
+        }
+    }
 }
 
 fn parse_query(url: &str) -> (String, String) {

@@ -9,9 +9,17 @@ import {
 } from "@/lib/tauri"
 import type { PromptSnapshot } from "@/lib/types"
 
+export type SessionStartSource = "startup" | "resume" | "clear" | "compact" | (string & {})
+
 export type ClaudeSession = {
   snapshots: PromptSnapshot[]
   agentId: string | null
+  /** Claude session id, captured when the SessionStart hook first fires. */
+  sessionId: string | null
+  /** Source reported by the most recent SessionStart hook. */
+  sessionSource: SessionStartSource | null
+  /** True while we're showing the `--resume` picker (no session has started yet). */
+  resumeMode: boolean
   isConnecting: boolean
   error: string | null
   /** Subscribe to PTY output bytes (base64-decoded). Returns an unsubscribe fn. */
@@ -19,6 +27,8 @@ export type ClaudeSession = {
   /** Send raw bytes (any ANSI escape / UTF-8 input) to the PTY. */
   writeInput: (bytes: Uint8Array) => void
   resize: (cols: number, rows: number) => void
+  /** Kill the current process and respawn. `resume:false` skips the picker. */
+  restart: (opts: { resume: boolean }) => void
 }
 
 function decodeBase64(data: string): Uint8Array {
@@ -41,28 +51,33 @@ function encodeBase64(bytes: Uint8Array): string {
 export function useClaudeSession(projectPath: string, projectId: string): ClaudeSession {
   const [snapshots, setSnapshots] = useState<PromptSnapshot[]>([])
   const [agentId, setAgentId] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionSource, setSessionSource] = useState<SessionStartSource | null>(null)
+  const [resumeMode, setResumeMode] = useState(true)
+  const [spawnSeq, setSpawnSeq] = useState(0)
   const [isConnecting, setIsConnecting] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const agentIdRef = useRef<string | null>(null)
   const outputListenersRef = useRef<Set<(b: Uint8Array) => void>>(new Set())
 
-  // One-shot spawn + event wiring on mount.
   useEffect(() => {
     let cancelled = false
     const unlisteners: Array<() => void> = []
 
     void (async () => {
       try {
-        // Load existing snapshots for the project.
-        try {
-          const existing = await listPromptSnapshots(projectId)
-          if (!cancelled) setSnapshots(existing)
-        } catch {
-          // non-fatal
+        // Load existing snapshots once (only on first spawn — restarts don't need to refetch).
+        if (spawnSeq === 0) {
+          try {
+            const existing = await listPromptSnapshots(projectId)
+            if (!cancelled) setSnapshots(existing)
+          } catch {
+            // non-fatal
+          }
         }
 
-        const result = await spawnClaude(projectPath, projectId)
+        const result = await spawnClaude(projectPath, projectId, resumeMode)
         if (cancelled) {
           void killClaude(result.agent_id)
           return
@@ -89,6 +104,18 @@ export function useClaudeSession(projectPath: string, projectId: string): Claude
         )
         unlisteners.push(snapshotUnlisten)
 
+        const sessionUnlisten = await listen<{
+          agent_id: string
+          session_id: string
+          source: SessionStartSource
+        }>("session-started", (evt) => {
+          if (evt.payload.agent_id !== agentIdRef.current) return
+          console.log("[creche] session-started", evt.payload)
+          setSessionId(evt.payload.session_id)
+          setSessionSource(evt.payload.source)
+        })
+        unlisteners.push(sessionUnlisten)
+
         setIsConnecting(false)
       } catch (e) {
         if (!cancelled) {
@@ -107,7 +134,7 @@ export function useClaudeSession(projectPath: string, projectId: string): Claude
         agentIdRef.current = null
       }
     }
-  }, [projectPath, projectId])
+  }, [projectPath, projectId, spawnSeq, resumeMode])
 
   const onOutput = useCallback((listener: (bytes: Uint8Array) => void): (() => void) => {
     outputListenersRef.current.add(listener)
@@ -128,5 +155,26 @@ export function useClaudeSession(projectPath: string, projectId: string): Claude
     void resizeClaude(id, cols, rows)
   }, [])
 
-  return { snapshots, agentId, isConnecting, error, onOutput, writeInput, resize }
+  const restart = useCallback((opts: { resume: boolean }): void => {
+    setResumeMode(opts.resume)
+    setSessionId(null)
+    setSessionSource(null)
+    setAgentId(null)
+    setIsConnecting(true)
+    setSpawnSeq((s) => s + 1)
+  }, [])
+
+  return {
+    snapshots,
+    agentId,
+    sessionId,
+    sessionSource,
+    resumeMode,
+    isConnecting,
+    error,
+    onOutput,
+    writeInput,
+    resize,
+    restart,
+  }
 }
