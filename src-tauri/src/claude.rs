@@ -607,7 +607,11 @@ fn handle_stop(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &ser
             first_line(&prompt)
         }
     };
-    let full_message = format!("{generated}\n\nPrompt: {prompt}");
+    // Trailing blank line is load-bearing: without it, a single-line `Prompt: …`
+    // sits in the same paragraph as the appended `Creche-Session-Id` trailer,
+    // and git's interpret-trailers treats `Prompt:` as a trailer too. The blank
+    // line forces the appended trailer into its own block.
+    let full_message = format!("{generated}\n\nPrompt: {prompt}\n\n");
     let subject = first_line(&generated);
 
     let commit_result = commit_with_session_trailer(path, &session_id, &full_message);
