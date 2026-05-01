@@ -35,7 +35,6 @@ function formatTime(unixSeconds: number): string {
   return `${hours}:${minutes}`
 }
 
-const CLICK_DELAY_MS = 220
 const DRAG_THRESHOLD_PX = 4
 
 export function ChatSidebar({
@@ -84,7 +83,6 @@ export function ChatSidebar({
   const dragStartedRef = useRef(false)
   const mouseStartXYRef = useRef<{ x: number; y: number } | null>(null)
   const suppressClickRef = useRef(false)
-  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Always reset drag state on global mouseup so we don't leak state when
   // mouseup happens outside the sidebar.
@@ -97,13 +95,6 @@ export function ChatSidebar({
     window.addEventListener("mouseup", onUp)
     return () => window.removeEventListener("mouseup", onUp)
   }, [])
-
-  const cancelClickTimer = (): void => {
-    if (clickTimerRef.current) {
-      clearTimeout(clickTimerRef.current)
-      clickTimerRef.current = null
-    }
-  }
 
   const handleMouseDown = (key: RowKey, e: React.MouseEvent): void => {
     if (e.button !== 0) return
@@ -128,7 +119,6 @@ export function ChatSidebar({
 
     dragStartedRef.current = true
     suppressClickRef.current = true
-    cancelClickTimer()
 
     const anchor = dragAnchorRef.current
     const a = indexFor(anchor)
@@ -159,24 +149,19 @@ export function ChatSidebar({
       suppressClickRef.current = false
       return
     }
-    cancelClickTimer()
-    // Defer single-click action so a double-click can pre-empt it.
-    clickTimerRef.current = setTimeout(() => {
-      clickTimerRef.current = null
-      if (key === null) {
-        // Click on Current Session = back to the terminal (no diff).
-        onSelect(null)
-      } else {
-        // Click on a commit = from that commit through to the present.
-        onSelect({ older: key, newer: null })
-      }
-    }, CLICK_DELAY_MS)
+    // Single-click commits immediately. The browser's later `dblclick`
+    // event will override this with the just-this-row selection.
+    if (key === null) {
+      // Click on Current Session = back to the terminal (no diff).
+      onSelect(null)
+    } else {
+      // Click on a commit = from that commit through to the present.
+      onSelect({ older: key, newer: null })
+    }
   }
 
   const handleDoubleClick = (key: RowKey): void => {
-    cancelClickTimer()
     suppressClickRef.current = false
-    // Double-click = just this row.
     onSelect({ older: key, newer: key })
   }
 
