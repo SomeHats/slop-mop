@@ -238,6 +238,12 @@ pub fn spawn_claude(
     cmd.cwd(&project_path);
     cmd.env("PATH", shell_path());
     cmd.env("TERM", "xterm-256color");
+    // Pin truecolor so claude emits 24-bit RGB SGRs regardless of how the app
+    // was launched. Without this, a bundled .app inherits an empty COLORTERM
+    // and falls back to the 256-color palette, while `pnpm dev` inherits
+    // COLORTERM=truecolor from the surrounding shell — producing visibly
+    // different colors between dev and prod.
+    cmd.env("COLORTERM", "truecolor");
 
     let child = pair
         .slave
