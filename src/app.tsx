@@ -95,6 +95,7 @@ function ProjectApp({
           diffStats={diffStats}
           selectedCommitHash={selectedHash}
           onSelect={setSelectedHash}
+          committing={session.isCommitting}
         />
         <div className="relative flex-1 overflow-hidden">
           {/* Terminal stays mounted in layout (real dimensions) so xterm's

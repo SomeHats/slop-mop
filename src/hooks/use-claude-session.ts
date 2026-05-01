@@ -21,6 +21,8 @@ export type ClaudeSession = {
   /** True while we're showing the `--resume` picker (no session has started yet). */
   resumeMode: boolean
   isConnecting: boolean
+  /** True while one or more git commits are in flight (checkpoint or post-prompt). */
+  isCommitting: boolean
   error: string | null
   /** Subscribe to PTY output bytes (base64-decoded). Returns an unsubscribe fn. */
   onOutput: (listener: (bytes: Uint8Array) => void) => () => void
@@ -56,6 +58,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
   const [resumeMode, setResumeMode] = useState(true)
   const [spawnSeq, setSpawnSeq] = useState(0)
   const [isConnecting, setIsConnecting] = useState(true)
+  const [committingCount, setCommittingCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   const agentIdRef = useRef<string | null>(null)
@@ -106,6 +109,18 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
           )
         })
         unlisteners.push(sessionUnlisten)
+
+        const startedUnlisten = await listen<{ agent_id: string }>("commit-started", (evt) => {
+          if (evt.payload.agent_id !== agentIdRef.current) return
+          setCommittingCount((n) => n + 1)
+        })
+        unlisteners.push(startedUnlisten)
+
+        const finishedUnlisten = await listen<{ agent_id: string }>("commit-finished", (evt) => {
+          if (evt.payload.agent_id !== agentIdRef.current) return
+          setCommittingCount((n) => Math.max(0, n - 1))
+        })
+        unlisteners.push(finishedUnlisten)
 
         const committedUnlisten = await listen<{
           agent_id: string
@@ -174,6 +189,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     setSessionSource(null)
     setAgentId(null)
     setCommits([])
+    setCommittingCount(0)
     setIsConnecting(true)
     setSpawnSeq((s) => s + 1)
   }, [])
@@ -185,6 +201,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     sessionSource,
     resumeMode,
     isConnecting,
+    isCommitting: committingCount > 0,
     error,
     onOutput,
     writeInput,

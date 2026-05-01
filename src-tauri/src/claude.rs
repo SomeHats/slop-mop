@@ -409,6 +409,20 @@ struct PromptCommittedEvent {
     timestamp_unix: i64,
 }
 
+#[derive(Clone, Serialize)]
+struct CommitStatusEvent {
+    agent_id: String,
+}
+
+fn emit_to_window<S: Serialize + Clone>(app: &AppHandle, window_label: &str, event: &str, payload: S) {
+    for (_, w) in app.webview_windows() {
+        if w.label() == window_label {
+            let _ = w.emit(event, payload);
+            return;
+        }
+    }
+}
+
 fn run_hook_server(app: AppHandle, window_label: String, server: Arc<Server>) {
     eprintln!(
         "[hook] listener started window={window_label} addr={:?}",
@@ -464,7 +478,7 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
     };
 
     match path.as_str() {
-        "/prompt" => handle_prompt(app, &agent_id, &parsed),
+        "/prompt" => handle_prompt(app, window_label, &agent_id, &parsed),
         "/session-start" => handle_session_start(app, window_label, &agent_id, &parsed),
         "/stop" => handle_stop(app, window_label, &agent_id, &parsed),
         other => eprintln!("[hook] unknown path: {other}"),
@@ -476,7 +490,12 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
 
 /// UserPromptSubmit: stash the prompt for the upcoming Stop, and commit any
 /// pre-existing uncommitted work as a "check point" so Claude's diff is clean.
-fn handle_prompt(app: &AppHandle, agent_id: &str, parsed: &serde_json::Value) {
+fn handle_prompt(
+    app: &AppHandle,
+    window_label: &str,
+    agent_id: &str,
+    parsed: &serde_json::Value,
+) {
     let session_id = parsed
         .get("session_id")
         .and_then(|v| v.as_str())
@@ -520,10 +539,15 @@ fn handle_prompt(app: &AppHandle, agent_id: &str, parsed: &serde_json::Value) {
 
     match stage_all_and_check_dirty(path) {
         Ok(false) => eprintln!("[hook] checkpoint skipped (clean tree)"),
-        Ok(true) => match commit_with_session_trailer(path, &session_id, "check point") {
-            Ok(()) => eprintln!("[hook] checkpoint committed"),
-            Err(e) => eprintln!("[hook] checkpoint commit failed: {e}"),
-        },
+        Ok(true) => {
+            let payload = CommitStatusEvent { agent_id: agent_id.to_string() };
+            emit_to_window(app, window_label, "commit-started", payload.clone());
+            match commit_with_session_trailer(path, &session_id, "check point") {
+                Ok(()) => eprintln!("[hook] checkpoint committed"),
+                Err(e) => eprintln!("[hook] checkpoint commit failed: {e}"),
+            }
+            emit_to_window(app, window_label, "commit-finished", payload);
+        }
         Err(e) => eprintln!("[hook] checkpoint stage failed: {e}"),
     }
 }
@@ -572,7 +596,11 @@ fn handle_stop(
     }
 
     let subject = first_line(&prompt);
-    if let Err(e) = commit_with_session_trailer(path, &session_id, &subject) {
+    let status_payload = CommitStatusEvent { agent_id: agent_id.to_string() };
+    emit_to_window(app, window_label, "commit-started", status_payload.clone());
+    let commit_result = commit_with_session_trailer(path, &session_id, &subject);
+    emit_to_window(app, window_label, "commit-finished", status_payload);
+    if let Err(e) = commit_result {
         eprintln!("[hook] stop commit failed: {e}");
         return;
     }
@@ -596,12 +624,7 @@ fn handle_stop(
         prompt: subject,
         timestamp_unix,
     };
-    for (_, w) in app.webview_windows() {
-        if w.label() == window_label {
-            let _ = w.emit("prompt-committed", event.clone());
-            break;
-        }
-    }
+    emit_to_window(app, window_label, "prompt-committed", event);
     eprintln!("[hook] stop commit emitted");
 }
 
@@ -657,12 +680,7 @@ fn handle_session_start(
         session_id,
         source,
     };
-    for (_, w) in app.webview_windows() {
-        if w.label() == window_label {
-            let _ = w.emit("session-started", event.clone());
-            break;
-        }
-    }
+    emit_to_window(app, window_label, "session-started", event);
 }
 
 fn parse_query(url: &str) -> (String, String) {

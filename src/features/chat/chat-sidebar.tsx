@@ -9,6 +9,7 @@ type ChatSidebarProps = {
   diffStats: Map<string, DiffStats>
   selectedCommitHash: string | null
   onSelect: (hash: string | null) => void
+  committing: boolean
 }
 
 function formatTime(unixSeconds: number): string {
@@ -23,10 +24,15 @@ export function ChatSidebar({
   diffStats,
   selectedCommitHash,
   onSelect,
+  committing,
 }: ChatSidebarProps): React.JSX.Element {
   return (
     <div className="flex w-80 flex-col overflow-hidden border-r border-border bg-background">
-      <CurrentSessionEntry selected={selectedCommitHash === null} onSelect={() => onSelect(null)} />
+      <CurrentSessionEntry
+        selected={selectedCommitHash === null}
+        onSelect={() => onSelect(null)}
+        committing={committing}
+      />
       <ScrollArea className="min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:!block">
         <div className="flex w-full flex-col">
           {commits.length === 0 ? (
