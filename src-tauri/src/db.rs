@@ -38,7 +38,20 @@ impl Db {
                 name TEXT NOT NULL,
                 path TEXT NOT NULL UNIQUE,
                 opened_at TEXT NOT NULL DEFAULT (datetime('now'))
-            );",
+            );
+            CREATE TABLE IF NOT EXISTS comments (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                commit_hash TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                range_start INTEGER NOT NULL,
+                range_end INTEGER,
+                contents TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                CHECK (range_start >= 1),
+                CHECK (range_end IS NULL OR range_end > range_start)
+            );
+            CREATE INDEX IF NOT EXISTS idx_comments_session ON comments(session_id);",
         )
         .map_err(|e| Error::Database(e.to_string()))?;
         Ok(())

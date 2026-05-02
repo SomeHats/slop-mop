@@ -1,15 +1,17 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { ChatSidebar } from "./features/chat/chat-sidebar"
-import { DiffPanel } from "./features/diff/diff-panel"
+import { CommentsPanel } from "./features/comments/comments-panel"
+import { useSessionComments } from "./features/comments/use-session-comments"
+import { DiffPanel, type DiffPanelHandle } from "./features/diff/diff-panel"
 import { ProjectPicker } from "./features/projects/project-picker"
 import { TerminalPanel } from "./features/terminal/terminal-panel"
 import { useClaudeSession } from "./hooks/use-claude-session"
 import { useDiffStats } from "./hooks/use-diff-stats"
 import { useFullscreen } from "./hooks/use-fullscreen"
 import { useRangeDiff } from "./hooks/use-range-diff"
-import { startWatching } from "./lib/tauri"
+import { createComment, startWatching } from "./lib/tauri"
 import type { Selection } from "./lib/types"
 
 const project = window.__PROJECT
@@ -62,7 +64,52 @@ function ProjectApp({
   const diffStats = useDiffStats(projectPath, session.commits)
   const { fileDiffs, isLoading: isDiffLoading } = useRangeDiff(projectPath, selection)
 
+  const sessionComments = useSessionComments(projectPath, session.sessionId, selection)
+  const diffPanelRef = useRef<DiffPanelHandle | null>(null)
+
+  // Comment creation is only available when the diff is anchored to a real
+  // commit (selection.newer is a hash). The button-disable upstream enforces
+  // this; the early-return below is a safety net.
+  const handleSubmitComment = useCallback(
+    async (
+      filePath: string,
+      rangeStart: number,
+      rangeEnd: number | null,
+      contents: string,
+    ): Promise<void> => {
+      if (!session.sessionId || !selection?.newer) return
+      const created = await createComment({
+        sessionId: session.sessionId,
+        commitHash: selection.newer,
+        filePath,
+        rangeStart,
+        rangeEnd,
+        contents,
+      })
+      sessionComments.add(created)
+    },
+    [session.sessionId, selection, sessionComments.add],
+  )
+
+  const handleJumpToComment = useCallback(
+    (commentId: string): void => {
+      const item = sessionComments.comments.find((c) => c.comment.id === commentId)
+      if (!item) return
+      const proj = item.projection
+      if (proj?.kind === "located") {
+        const filePath = proj.path ?? item.comment.file_path
+        const ok = diffPanelRef.current?.scrollToLine(filePath, proj.start) ?? false
+        if (ok) return
+      }
+      // Fallback: navigate selection to the anchor commit so the user can see
+      // the comment in its original location.
+      setSelection({ older: item.comment.commit_hash, newer: item.comment.commit_hash })
+    },
+    [sessionComments.comments],
+  )
+
   const showTerminal = selection === null
+  const commentingEnabled = !showTerminal && selection !== null && selection.newer !== null
   // The `claude --resume` picker doesn't offer a "start new session" option, so we
   // overlay our own button while the user hasn't picked a session yet. Once the
   // SessionStart hook fires (either pick from picker, or our restart-without-resume),
@@ -98,6 +145,15 @@ function ProjectApp({
           selection={selection}
           onSelect={setSelection}
           committing={session.isCommitting}
+          bottomPanel={
+            <CommentsPanel
+              comments={sessionComments.comments}
+              onJump={handleJumpToComment}
+              onDelete={(id) => {
+                void sessionComments.remove(id)
+              }}
+            />
+          }
         />
         <div className="relative flex-1 overflow-hidden">
           {/* Terminal stays mounted in layout (real dimensions) so xterm's
@@ -132,6 +188,9 @@ function ProjectApp({
                 isLoading={isDiffLoading}
                 selection={selection}
                 commits={session.commits}
+                commentingEnabled={commentingEnabled}
+                onSubmitComment={handleSubmitComment}
+                handleRef={diffPanelRef}
               />
             </div>
           )}

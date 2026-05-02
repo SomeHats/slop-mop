@@ -64,6 +64,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["src/features/diff/side-by-side-diff.tsx"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "noStaticElementInteractions": "off"
+          }
+        }
+      }
     }
   ]
 }

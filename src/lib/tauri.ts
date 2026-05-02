@@ -1,5 +1,12 @@
 import { invoke } from "@tauri-apps/api/core"
-import type { DiffStats, FileDiff, Project, SessionCommit } from "./types"
+import type {
+  Comment,
+  DiffStats,
+  FileDiff,
+  Project,
+  ProjectedComment,
+  SessionCommit,
+} from "./types"
 
 export function openProject(path: string): Promise<Project> {
   return invoke<Project>("open_project", { path })
@@ -66,4 +73,35 @@ export function startWatching(projectPath: string): Promise<void> {
 
 export function stopWatching(): Promise<void> {
   return invoke("stop_watching")
+}
+
+export function createComment(args: {
+  sessionId: string
+  commitHash: string
+  filePath: string
+  rangeStart: number
+  rangeEnd: number | null
+  contents: string
+}): Promise<Comment> {
+  return invoke<Comment>("create_comment", args)
+}
+
+export function listComments(sessionId: string): Promise<Comment[]> {
+  return invoke<Comment[]>("list_comments", { sessionId })
+}
+
+export function deleteComment(id: string): Promise<void> {
+  return invoke("delete_comment", { id })
+}
+
+export function projectComments(
+  projectPath: string,
+  commentIds: string[],
+  targetCommit: string | null,
+): Promise<ProjectedComment[]> {
+  return invoke<ProjectedComment[]>("project_comments", {
+    projectPath,
+    commentIds,
+    targetCommit,
+  })
 }

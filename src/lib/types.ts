@@ -66,3 +66,32 @@ export type FileDiff = {
   additions: number
   deletions: number
 }
+
+export type Comment = {
+  id: string
+  session_id: string
+  commit_hash: string
+  file_path: string
+  range_start: number
+  /** NULL for single-line comments. When set, strictly greater than `range_start`. */
+  range_end: number | null
+  contents: string
+  created_at: string
+}
+
+export type OrphanReason = "line_deleted" | "file_deleted"
+
+/**
+ * Result of projecting a comment's anchor through an intervening diff.
+ * - `located` — the range still has a position in the target view; `path` is
+ *   set when the file was renamed.
+ * - `orphaned` — the range no longer has a coherent position.
+ */
+export type ProjectionResult =
+  | { kind: "located"; path: string | null; start: number; end: number | null }
+  | { kind: "orphaned"; reason: OrphanReason }
+
+export type ProjectedComment = {
+  comment_id: string
+  result: ProjectionResult
+}

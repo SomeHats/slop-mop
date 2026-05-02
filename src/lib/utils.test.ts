@@ -8,9 +8,7 @@ describe("cn", () => {
 
   it("merges conflicting Tailwind utilities, last one wins", () => {
     expect(cn("p-2", "p-4")).toBe("p-4")
-    expect(cn("text-sm text-foreground", "text-base")).toBe(
-      "text-foreground text-base",
-    )
+    expect(cn("text-sm text-foreground", "text-base")).toBe("text-foreground text-base")
   })
 
   it("supports clsx-style object and array inputs", () => {

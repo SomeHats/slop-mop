@@ -1,12 +1,45 @@
 import { ChevronDown, ChevronUp } from "lucide-react"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
+import { CommentComposer } from "@/features/comments/comment-composer"
 import { tokenStyle } from "@/lib/shiki"
 import type { FileDiff } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { EXPAND_STEP, type RegionExpansion } from "./compute-diff-rows"
 import type { HighlightedLineData, HighlightedStickyLine } from "./use-highlighted-diff"
 import { useHighlightedDiff } from "./use-highlighted-diff"
+
+export type SideBySideDiffProps = {
+  file: FileDiff
+  /** When true, right-side context/addition lines are click + drag commentable. */
+  commentingEnabled: boolean
+  /** Called when the user submits the composer for the current selection. */
+  onSubmitComment?:
+    | ((
+        filePath: string,
+        rangeStart: number,
+        rangeEnd: number | null,
+        contents: string,
+      ) => Promise<void> | void)
+    | undefined
+  /** Imperative ref to scroll a specific line into view from outside (e.g. sidebar click). */
+  scrollLineRef?: React.MutableRefObject<((lineNo: number) => void) | null> | undefined
+}
+
+type PendingRange = { anchor: number; current: number }
+
+function rangeBounds(p: PendingRange): { start: number; end: number | null } {
+  const lo = Math.min(p.anchor, p.current)
+  const hi = Math.max(p.anchor, p.current)
+  return { start: lo, end: lo === hi ? null : hi }
+}
+
+function lineInPending(line: number | null | undefined, p: PendingRange | null): boolean {
+  if (!p || line == null) return false
+  const lo = Math.min(p.anchor, p.current)
+  const hi = Math.max(p.anchor, p.current)
+  return line >= lo && line <= hi
+}
 
 const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   added: "default",
@@ -21,8 +54,16 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | 
  */
 const ROW_HEIGHT_REM = 1.25
 
-export function SideBySideDiff({ file }: { file: FileDiff }): React.JSX.Element {
+export function SideBySideDiff({
+  file,
+  commentingEnabled,
+  onSubmitComment,
+  scrollLineRef,
+}: SideBySideDiffProps): React.JSX.Element {
   const [expansions, setExpansions] = useState<Map<number, RegionExpansion>>(() => new Map())
+  const [pending, setPending] = useState<PendingRange | null>(null)
+  const [composer, setComposer] = useState<{ start: number; end: number | null } | null>(null)
+  const lineRefsRef = useRef<Map<number, HTMLDivElement>>(new Map())
 
   const handleExpandTop = useCallback((regionIndex: number): void => {
     setExpansions((prev) => {
@@ -55,6 +96,52 @@ export function SideBySideDiff({ file }: { file: FileDiff }): React.JSX.Element 
   )
 
   const { rows } = useHighlightedDiff(file, expansions)
+
+  // Mouseup anywhere finalizes a pending drag into the composer state.
+  // Listening at window-level handles mouseups outside the diff.
+  useEffect(() => {
+    if (!pending) return
+    const onUp = (): void => {
+      setPending((p) => {
+        if (!p) return null
+        const { start, end } = rangeBounds(p)
+        setComposer({ start, end })
+        return null
+      })
+    }
+    window.addEventListener("mouseup", onUp)
+    return () => window.removeEventListener("mouseup", onUp)
+  }, [pending])
+
+  // Scroll-to-line: imperatively scrolls a right-side line into view.
+  useEffect(() => {
+    if (!scrollLineRef) return
+    scrollLineRef.current = (lineNo: number): void => {
+      const el = lineRefsRef.current.get(lineNo)
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" })
+    }
+    return () => {
+      if (scrollLineRef.current) scrollLineRef.current = null
+    }
+  }, [scrollLineRef])
+
+  const handleLineMouseDown = useCallback(
+    (lineNo: number) =>
+      (e: React.MouseEvent): void => {
+        if (!commentingEnabled || e.button !== 0) return
+        e.preventDefault()
+        setComposer(null)
+        setPending({ anchor: lineNo, current: lineNo })
+      },
+    [commentingEnabled],
+  )
+
+  const handleLineMouseEnter = useCallback(
+    (lineNo: number) => (): void => {
+      setPending((p) => (p ? { ...p, current: lineNo } : null))
+    },
+    [],
+  )
 
   // Consistent gutter width based on max line number
   const gutterWidth = useMemo(() => {
@@ -102,6 +189,12 @@ export function SideBySideDiff({ file }: { file: FileDiff }): React.JSX.Element 
     }
     return bars
   }, [rows])
+
+  // While the composer is open, also highlight the locked-in range visually.
+  const lockedRange: PendingRange | null = composer
+    ? { anchor: composer.start, current: composer.end ?? composer.start }
+    : null
+  const highlightRange = pending ?? lockedRange
 
   return (
     <div className="flex flex-col border border-border">
@@ -198,10 +291,24 @@ export function SideBySideDiff({ file }: { file: FileDiff }): React.JSX.Element 
               ) : (
                 <div
                   key={i.toString()}
+                  onMouseDown={
+                    commentingEnabled && row.right?.lineNo
+                      ? handleLineMouseDown(row.right.lineNo)
+                      : undefined
+                  }
+                  onMouseEnter={
+                    commentingEnabled && row.right?.lineNo
+                      ? handleLineMouseEnter(row.right.lineNo)
+                      : undefined
+                  }
                   className={cn(
                     "h-5 select-none px-2 text-right",
                     codeCellBg(row.right),
                     gutterText(row.right),
+                    lineInPending(row.right?.lineNo, highlightRange) && "bg-purple-500/30",
+                    commentingEnabled &&
+                      row.right?.lineNo &&
+                      "cursor-pointer hover:bg-purple-500/20",
                   )}
                 >
                   {row.right?.lineNo ?? ""}
@@ -222,7 +329,31 @@ export function SideBySideDiff({ file }: { file: FileDiff }): React.JSX.Element 
                     }}
                   />
                 ) : (
-                  <CodeCell key={i.toString()} line={row.right} />
+                  <CodeCell
+                    key={i.toString()}
+                    line={row.right}
+                    pending={lineInPending(row.right?.lineNo, highlightRange)}
+                    onMouseDown={
+                      commentingEnabled && row.right?.lineNo
+                        ? handleLineMouseDown(row.right.lineNo)
+                        : undefined
+                    }
+                    onMouseEnter={
+                      commentingEnabled && row.right?.lineNo
+                        ? handleLineMouseEnter(row.right.lineNo)
+                        : undefined
+                    }
+                    registerRef={
+                      row.right?.lineNo
+                        ? (el) => {
+                            const lineNo = row.right?.lineNo
+                            if (lineNo == null) return
+                            if (el) lineRefsRef.current.set(lineNo, el)
+                            else lineRefsRef.current.delete(lineNo)
+                          }
+                        : undefined
+                    }
+                  />
                 ),
               )}
             </div>
@@ -292,13 +423,53 @@ export function SideBySideDiff({ file }: { file: FileDiff }): React.JSX.Element 
           </div>
         ))}
       </div>
+
+      {composer && (
+        <div className="border-t border-border bg-background p-2">
+          <CommentComposer
+            rangeStart={composer.start}
+            rangeEnd={composer.end}
+            onCancel={() => setComposer(null)}
+            onSubmit={async (contents) => {
+              if (onSubmitComment) {
+                await onSubmitComment(file.path, composer.start, composer.end, contents)
+              }
+              setComposer(null)
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }
 
-function CodeCell({ line }: { line: HighlightedLineData | null }): React.JSX.Element {
+type CodeCellProps = {
+  line: HighlightedLineData | null
+  pending?: boolean | undefined
+  onMouseDown?: ((e: React.MouseEvent) => void) | undefined
+  onMouseEnter?: (() => void) | undefined
+  registerRef?: ((el: HTMLDivElement | null) => void) | undefined
+}
+
+function CodeCell({
+  line,
+  pending,
+  onMouseDown,
+  onMouseEnter,
+  registerRef,
+}: CodeCellProps): React.JSX.Element {
   return (
-    <div className={cn("h-5 whitespace-pre pr-4", codeCellBg(line))}>
+    <div
+      ref={registerRef}
+      onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
+      className={cn(
+        "h-5 whitespace-pre pr-4",
+        codeCellBg(line),
+        pending && "bg-purple-500/30",
+        onMouseDown && "cursor-pointer",
+      )}
+    >
       {line?.tokens
         ? line.tokens.map((token, j) => (
             <span key={j.toString()} style={tokenStyle(token)}>

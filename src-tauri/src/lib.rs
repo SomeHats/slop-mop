@@ -1,4 +1,5 @@
 mod claude;
+mod comments;
 mod commits;
 mod db;
 mod diff;
@@ -56,6 +57,10 @@ pub fn run() {
             diff::get_range_diff,
             watcher::start_watching,
             watcher::stop_watching,
+            comments::create_comment,
+            comments::list_comments,
+            comments::delete_comment,
+            comments::project_comments,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

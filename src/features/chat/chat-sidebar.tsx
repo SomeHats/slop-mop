@@ -11,6 +11,8 @@ type ChatSidebarProps = {
   selection: Selection | null
   onSelect: (sel: Selection | null) => void
   committing: boolean
+  /** Slot rendered below the prompt history (e.g. CommentsPanel). */
+  bottomPanel?: React.ReactNode
 }
 
 /**
@@ -43,6 +45,7 @@ export function ChatSidebar({
   selection,
   onSelect,
   committing,
+  bottomPanel,
 }: ChatSidebarProps): React.JSX.Element {
   // Rows: Current Session at the top, then commits in newest-first order
   // (matches `commits` from useClaudeSession).
@@ -251,6 +254,7 @@ export function ChatSidebar({
           )}
         </div>
       </ScrollArea>
+      {bottomPanel}
     </div>
   )
 }
