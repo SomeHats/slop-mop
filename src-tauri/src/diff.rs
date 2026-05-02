@@ -254,3 +254,76 @@ pub fn get_range_diff(
 
     Ok(file_diffs)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use git2::{IndexAddOption, Signature};
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn make_commit(repo: &Repository, message: &str) -> git2::Oid {
+        let sig = Signature::now("test", "test@example.com").unwrap();
+        let mut index = repo.index().unwrap();
+        index
+            .add_all(["*"].iter(), IndexAddOption::DEFAULT, None)
+            .unwrap();
+        index.write().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        let parents: Vec<git2::Commit<'_>> = match repo.head() {
+            Ok(h) => vec![h.peel_to_commit().unwrap()],
+            Err(_) => vec![],
+        };
+        let parent_refs: Vec<&git2::Commit<'_>> = parents.iter().collect();
+        repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &parent_refs)
+            .unwrap()
+    }
+
+    #[test]
+    fn delta_to_status_covers_known_variants() {
+        assert_eq!(delta_to_status(Delta::Added), "added");
+        assert_eq!(delta_to_status(Delta::Deleted), "deleted");
+        assert_eq!(delta_to_status(Delta::Modified), "modified");
+        assert_eq!(delta_to_status(Delta::Renamed), "renamed");
+        assert_eq!(delta_to_status(Delta::Unmodified), "unknown");
+    }
+
+    #[test]
+    fn batch_diff_stats_counts_root_and_modification_commits() {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+
+        // Root commit: add a file with two lines.
+        fs::write(dir.path().join("a.txt"), "one\ntwo\n").unwrap();
+        let root = make_commit(&repo, "root");
+
+        // Second commit: add a line, remove a line.
+        fs::write(dir.path().join("a.txt"), "one\nTWO\nthree\n").unwrap();
+        let second = make_commit(&repo, "edit");
+
+        drop(repo);
+
+        let stats = batch_diff_stats(
+            dir.path().to_string_lossy().into_owned(),
+            vec![root.to_string(), second.to_string()],
+        )
+        .unwrap();
+
+        assert_eq!(stats.len(), 2);
+        assert_eq!(stats[0].commit_hash, root.to_string());
+        assert_eq!(stats[0].additions, 2);
+        assert_eq!(stats[0].deletions, 0);
+
+        assert_eq!(stats[1].commit_hash, second.to_string());
+        assert_eq!(stats[1].additions, 2);
+        assert_eq!(stats[1].deletions, 1);
+    }
+
+    #[test]
+    fn batch_diff_stats_errors_on_non_repo() {
+        let dir = TempDir::new().unwrap();
+        let err = batch_diff_stats(dir.path().to_string_lossy().into_owned(), vec![]);
+        assert!(matches!(err, Err(Error::NotAGitRepo(_))));
+    }
+}
