@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest"
-import type { ProjectionResult } from "@/lib/types"
-import { isOrphaned, projectedSuffix, rangeLabel } from "./comments-format"
+import type { Comment, ProjectionResult } from "@/lib/types"
+import { displayLocation, isOrphaned, rangeLabel } from "./comments-format"
+
+const baseComment: Comment = {
+  id: "c1",
+  session_id: "s1",
+  commit_hash: "abcdef1234567890",
+  file_path: "src/old.ts",
+  range_start: 5,
+  range_end: 9,
+  contents: "review me",
+  created_at: "2026-05-02T00:00:00Z",
+}
 
 describe("rangeLabel", () => {
   it("formats a single line as `:N`", () => {
@@ -12,39 +23,30 @@ describe("rangeLabel", () => {
   })
 })
 
-describe("projectedSuffix", () => {
-  it("returns empty when no projection has resolved yet", () => {
-    expect(projectedSuffix(null)).toBe("")
+describe("displayLocation", () => {
+  it("falls back to anchor coords while projection is unresolved", () => {
+    expect(displayLocation(baseComment, null)).toBe("src/old.ts:5–9")
   })
 
-  it("returns empty for orphaned projections", () => {
-    const result: ProjectionResult = { kind: "orphaned", reason: "line_deleted" }
-    expect(projectedSuffix(result)).toBe("")
+  it("falls back to anchor coords for orphaned projections", () => {
+    const proj: ProjectionResult = { kind: "orphaned", reason: "line_deleted" }
+    expect(displayLocation(baseComment, proj)).toBe("src/old.ts:5–9")
   })
 
-  it("returns empty when located but path is unchanged (no rename)", () => {
-    const result: ProjectionResult = { kind: "located", path: null, start: 5, end: null }
-    expect(projectedSuffix(result)).toBe("")
+  it("uses projected line numbers when located in same file", () => {
+    const proj: ProjectionResult = { kind: "located", path: null, start: 8, end: 12 }
+    expect(displayLocation(baseComment, proj)).toBe("src/old.ts:8–12")
   })
 
-  it("renders the new path + range when the file was renamed", () => {
-    const result: ProjectionResult = {
-      kind: "located",
-      path: "src/new.ts",
-      start: 5,
-      end: 9,
-    }
-    expect(projectedSuffix(result)).toBe(" → src/new.ts:5–9")
+  it("uses projected path + lines when the file was renamed", () => {
+    const proj: ProjectionResult = { kind: "located", path: "src/new.ts", start: 8, end: 12 }
+    expect(displayLocation(baseComment, proj)).toBe("src/new.ts:8–12")
   })
 
-  it("renders the new path + single-line range on rename", () => {
-    const result: ProjectionResult = {
-      kind: "located",
-      path: "src/new.ts",
-      start: 5,
-      end: null,
-    }
-    expect(projectedSuffix(result)).toBe(" → src/new.ts:5")
+  it("collapses single-line projection back to `:N`", () => {
+    const single: Comment = { ...baseComment, range_end: null }
+    const proj: ProjectionResult = { kind: "located", path: null, start: 8, end: null }
+    expect(displayLocation(single, proj)).toBe("src/old.ts:8")
   })
 })
 

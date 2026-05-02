@@ -1,7 +1,7 @@
 import { Trash2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { isOrphaned, projectedSuffix, rangeLabel } from "./comments-format"
+import { displayLocation, isOrphaned } from "./comments-format"
 import type { CommentWithProjection } from "./use-session-comments"
 
 export type CommentsPanelProps = {
@@ -48,13 +48,8 @@ export function CommentsPanel({
                 className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left"
               >
                 <div className="flex w-full items-center gap-2">
-                  <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
-                    {comment.commit_hash.slice(0, 7)}
-                  </Badge>
                   <span className="truncate text-[10px] text-muted-foreground">
-                    {comment.file_path}
-                    {rangeLabel(comment.range_start, comment.range_end)}
-                    {projectedSuffix(projection)}
+                    {displayLocation(comment, projection)}
                   </span>
                   {orphaned && (
                     <Badge variant="destructive" className="ml-auto shrink-0 text-[10px]">

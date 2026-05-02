@@ -49,15 +49,20 @@ export function useSessionComments(
     }
   }, [sessionId])
 
-  // Re-project whenever selection or comment set changes.
+  // Re-project whenever selection or comment set changes. Projection target
+  // mirrors what the user is currently viewing: a commit hash when the diff is
+  // anchored to one, or workdir (None) for any view that includes uncommitted
+  // changes — including the terminal view (no selection), so the sidebar
+  // always reflects positions in the latest state.
   useEffect(() => {
-    if (!selection || comments.length === 0) {
+    if (comments.length === 0) {
       setProjections(new Map())
       return
     }
+    const target = selection?.newer ?? null
     const seq = ++reqSeqRef.current
     const ids = comments.map((c) => c.id)
-    void tauri.projectComments(projectPath, ids, selection.newer).then(
+    void tauri.projectComments(projectPath, ids, target).then(
       (results: ProjectedComment[]) => {
         if (seq !== reqSeqRef.current) return
         const map = new Map<string, ProjectionResult>()

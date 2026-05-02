@@ -1,4 +1,4 @@
-import type { ProjectionResult } from "@/lib/types"
+import type { Comment, ProjectionResult } from "@/lib/types"
 
 /** Render `:N` for a single line or `:A–B` for a range. */
 export function rangeLabel(start: number, end: number | null): string {
@@ -6,14 +6,17 @@ export function rangeLabel(start: number, end: number | null): string {
 }
 
 /**
- * Suffix shown after the original `path:range` to surface a renamed location
- * in the current view. Returns an empty string when no remapping is meaningful
- * (no projection yet, orphaned, or the file path didn't change).
+ * The location to display for a comment in the current view. When the
+ * projection has resolved we show the projected position (and renamed path,
+ * when applicable). Until it resolves we fall back to the anchor coordinates
+ * so the row is never blank.
  */
-export function projectedSuffix(projection: ProjectionResult | null): string {
-  if (!projection || projection.kind !== "located") return ""
-  if (projection.path === null) return ""
-  return ` → ${projection.path}${rangeLabel(projection.start, projection.end)}`
+export function displayLocation(comment: Comment, projection: ProjectionResult | null): string {
+  if (projection?.kind === "located") {
+    const path = projection.path ?? comment.file_path
+    return `${path}${rangeLabel(projection.start, projection.end)}`
+  }
+  return `${comment.file_path}${rangeLabel(comment.range_start, comment.range_end)}`
 }
 
 export function isOrphaned(projection: ProjectionResult | null): boolean {
