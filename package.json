@@ -12,7 +12,9 @@
     "check": "biome check .",
     "check:fix": "biome check --fix .",
     "typecheck": "tsc -b",
-    "test": "vitest run",
+    "test": "pnpm test:ts && pnpm test:rs",
+    "test:ts": "vitest run",
+    "test:rs": "cargo test --manifest-path src-tauri/Cargo.toml --lib",
     "test:watch": "vitest",
     "tauri": "tauri",
     "prepare": "husky"
