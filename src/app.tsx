@@ -92,6 +92,13 @@ function ProjectApp({
     [projectPath, selection],
   )
 
+  const handleDeleteComment = useCallback(
+    (id: string): void => {
+      void sessionComments.remove(id)
+    },
+    [sessionComments.remove],
+  )
+
   const handleSubmitComment = useCallback(
     async (
       filePath: string,
@@ -178,9 +185,7 @@ function ProjectApp({
               onToggleStaged={sessionComments.toggleStaged}
               onToggleAllStaged={sessionComments.setAllStaged}
               onJump={handleJumpToComment}
-              onDelete={(id) => {
-                void sessionComments.remove(id)
-              }}
+              onDelete={handleDeleteComment}
             />
           }
         />
@@ -219,9 +224,7 @@ function ProjectApp({
                 commits={session.commits}
                 commentingEnabled={commentingEnabled}
                 comments={sessionComments.comments}
-                onDeleteComment={(id) => {
-                  void sessionComments.remove(id)
-                }}
+                onDeleteComment={handleDeleteComment}
                 resolveAnchor={handleResolveAnchor}
                 onSubmitComment={handleSubmitComment}
                 handleRef={diffPanelRef}

@@ -6,6 +6,10 @@ import type { FileDiff, Selection, SessionCommit } from "@/lib/types"
 import { commentAnchorLine } from "./diff-layout"
 import { type InlineComment, type ResolvedAnchor, SideBySideDiff } from "./side-by-side-diff"
 
+// Stable empty array so SideBySideDiff's memo doesn't bust on every render for
+// files that have no inline comments.
+const EMPTY_INLINE_COMMENTS: InlineComment[] = []
+
 export type DiffPanelHandle = {
   /** Scroll the right-side `lineNo` of `filePath` into view. Returns true on success. */
   scrollToLine: (filePath: string, lineNo: number) => boolean
@@ -144,7 +148,7 @@ export function DiffPanel({
             file={file}
             commentingEnabled={commentingEnabled}
             resolveAnchor={resolveAnchor}
-            inlineComments={inlineCommentsByFile.get(file.path) ?? []}
+            inlineComments={inlineCommentsByFile.get(file.path) ?? EMPTY_INLINE_COMMENTS}
             onDeleteComment={onDeleteComment}
             onSubmitComment={onSubmitComment}
             scrollLineRef={refForFile(file.path)}

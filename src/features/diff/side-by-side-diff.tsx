@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp } from "lucide-react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { CommentComposer } from "@/features/comments/comment-composer"
 import { tokenStyle } from "@/lib/shiki"
@@ -97,7 +97,7 @@ type ComposerState = {
   end: number | null
 }
 
-export function SideBySideDiff({
+function SideBySideDiffInner({
   file,
   commentingEnabled,
   resolveAnchor,
@@ -710,3 +710,9 @@ function gutterText(line: HighlightedLineData | null): string {
       return "text-foreground/30"
   }
 }
+
+// Memoized wrapper. SideBySideDiff is the heaviest component in the tree
+// (syntax highlighting, virtualized layout) and gets re-mounted for every file
+// in the diff. Without memo, an unrelated parent re-render — e.g. toggling a
+// comment checkbox — re-runs all of this for every file.
+export const SideBySideDiff = memo(SideBySideDiffInner)
