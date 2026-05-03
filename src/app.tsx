@@ -174,6 +174,9 @@ function ProjectApp({
           bottomPanel={
             <CommentsPanel
               comments={sessionComments.comments}
+              staged={sessionComments.staged}
+              onToggleStaged={sessionComments.toggleStaged}
+              onToggleAllStaged={sessionComments.setAllStaged}
               onJump={handleJumpToComment}
               onDelete={(id) => {
                 void sessionComments.remove(id)

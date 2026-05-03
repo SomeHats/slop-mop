@@ -56,9 +56,7 @@ describe("computeStickyLines", () => {
 
     const sticky = computeStickyLines(rows, 0, 2)
 
-    expect(sticky).toEqual([
-      { content: "describe('outer', () => {", lineNo: 1, offsetFromTop: 0 },
-    ])
+    expect(sticky).toEqual([{ content: "describe('outer', () => {", lineNo: 1, offsetFromTop: 0 }])
   })
 
   test("keeps every opener when hidden region runs to EOF", () => {
