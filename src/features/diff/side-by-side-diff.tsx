@@ -63,6 +63,10 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | 
 /** Each code row is `h-5` (1.25rem). Multiply by the root font size to get pixels. */
 const ROW_HEIGHT_REM = 1.25
 
+/** Sentinel id used to slot the composer into the same overlay/spacer machinery
+ *  as committed comments. Never collides with a real UUID. */
+const COMPOSER_ID = "__composer__"
+
 function getRootFontSizePx(): number {
   if (typeof window === "undefined") return 16
   const fs = window.getComputedStyle(document.documentElement).fontSize
@@ -124,11 +128,13 @@ export function SideBySideDiff({
     setRowHeightPx(ROW_HEIGHT_REM * getRootFontSizePx())
   }, [])
 
-  // Drop measured heights for comments that have left the inline list so the
-  // map doesn't grow unbounded across re-projections.
+  // Drop measured heights for entries that no longer exist (comments removed
+  // from the inline list, composer closed) so the map doesn't grow unbounded.
+  const composerOpen = composer !== null
   useEffect(() => {
     setCommentHeights((prev) => {
       const ids = new Set(inlineComments.map((c) => c.comment.id))
+      if (composerOpen) ids.add(COMPOSER_ID)
       let changed = false
       const next = new Map<string, number>()
       for (const [id, h] of prev) {
@@ -137,7 +143,7 @@ export function SideBySideDiff({
       }
       return changed ? next : prev
     })
-  }, [inlineComments])
+  }, [inlineComments, composerOpen])
 
   // Single ResizeObserver per diff. Cards register their element via the ref
   // callback below; height changes feed back into commentHeights state, which
@@ -246,6 +252,11 @@ export function SideBySideDiff({
     return `${(String(max).length + 1).toString()}ch`
   }, [rows])
 
+  // Composer participates in the same overlay/spacer machinery as committed
+  // comments via a sentinel id. When present, it appears as the *last* item on
+  // its anchor line (so it sits below any existing comments on that same line).
+  const composerAnchorLine = composer ? (composer.end ?? composer.start) : null
+
   const commentsByAnchorLine = useMemo(() => {
     const map = new Map<number, Comment[]>()
     for (const ic of inlineComments) {
@@ -253,8 +264,23 @@ export function SideBySideDiff({
       if (list) list.push(ic.comment)
       else map.set(ic.anchorLine, [ic.comment])
     }
+    if (composerAnchorLine !== null) {
+      const placeholder: Comment = {
+        id: COMPOSER_ID,
+        session_id: "",
+        commit_hash: "",
+        file_path: file.path,
+        range_start: composer?.start ?? composerAnchorLine,
+        range_end: composer?.end ?? null,
+        contents: "",
+        created_at: "",
+      }
+      const list = map.get(composerAnchorLine)
+      if (list) list.push(placeholder)
+      else map.set(composerAnchorLine, [placeholder])
+    }
     return map
-  }, [inlineComments])
+  }, [inlineComments, composer, composerAnchorLine, file.path])
 
   const commentsById = useMemo(() => {
     const map = new Map<string, Comment>()
@@ -510,10 +536,33 @@ export function SideBySideDiff({
           </div>
         ))}
 
-        {/* Inline comment cards — absolute, full-width, ResizeObserver feeds
-         * height back into commentHeights state so the spacer in each column
-         * matches and rows below shift accordingly. */}
+        {/* Inline comment cards + composer — absolute, full-width.
+         * ResizeObserver feeds height back into commentHeights state so the
+         * spacer in each column matches and rows below shift accordingly. */}
         {layout.commentOverlays.map(({ commentId, topPx }) => {
+          if (commentId === COMPOSER_ID) {
+            if (!composer) return null
+            return (
+              <div
+                key="composer"
+                ref={registerCard(COMPOSER_ID)}
+                className="absolute left-0 right-0 z-[5] bg-background p-2"
+                style={{ top: `${topPx.toString()}px` }}
+              >
+                <CommentComposer
+                  rangeStart={composer.start}
+                  rangeEnd={composer.end}
+                  onCancel={() => setComposer(null)}
+                  onSubmit={async (contents) => {
+                    if (onSubmitComment) {
+                      await onSubmitComment(file.path, composer.start, composer.end, contents)
+                    }
+                    setComposer(null)
+                  }}
+                />
+              </div>
+            )
+          }
           const c = commentsById.get(commentId)
           if (!c) return null
           return (
@@ -528,22 +577,6 @@ export function SideBySideDiff({
           )
         })}
       </div>
-
-      {composer && (
-        <div className="border-t border-border bg-background p-2">
-          <CommentComposer
-            rangeStart={composer.start}
-            rangeEnd={composer.end}
-            onCancel={() => setComposer(null)}
-            onSubmit={async (contents) => {
-              if (onSubmitComment) {
-                await onSubmitComment(file.path, composer.start, composer.end, contents)
-              }
-              setComposer(null)
-            }}
-          />
-        </div>
-      )}
     </div>
   )
 }
