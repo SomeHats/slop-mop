@@ -3,16 +3,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { CommentComposer } from "@/features/comments/comment-composer"
 import { tokenStyle } from "@/lib/shiki"
-import type { FileDiff } from "@/lib/types"
+import type { Comment, FileDiff } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { EXPAND_STEP, type RegionExpansion } from "./compute-diff-rows"
-import type { HighlightedLineData, HighlightedStickyLine } from "./use-highlighted-diff"
+import { computeDiffLayout } from "./diff-layout"
+import { InlineCommentCard } from "./inline-comment-card"
+import type { HighlightedLineData } from "./use-highlighted-diff"
 import { useHighlightedDiff } from "./use-highlighted-diff"
+
+export type InlineComment = {
+  comment: Comment
+  /** Right-side line number in the currently shown diff (already projected). */
+  anchorLine: number
+}
 
 export type SideBySideDiffProps = {
   file: FileDiff
   /** When true, right-side context/addition lines are click + drag commentable. */
   commentingEnabled: boolean
+  /** Comments rendered inline under their anchor line. Already filtered to
+   *  this file and to projections that resolved (not orphaned). */
+  inlineComments: InlineComment[]
+  onDeleteComment: (id: string) => void
   /** Called when the user submits the composer for the current selection. */
   onSubmitComment?:
     | ((
@@ -48,22 +60,32 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | 
   renamed: "outline",
 }
 
-/**
- * Row height constant: each row is h-5 = 1.25rem (from leading-5).
- * Used to compute spacer heights and absolute positions for collapse bars.
- */
+/** Each code row is `h-5` (1.25rem). Multiply by the root font size to get pixels. */
 const ROW_HEIGHT_REM = 1.25
+
+function getRootFontSizePx(): number {
+  if (typeof window === "undefined") return 16
+  const fs = window.getComputedStyle(document.documentElement).fontSize
+  const n = Number.parseFloat(fs)
+  return Number.isFinite(n) && n > 0 ? n : 16
+}
 
 export function SideBySideDiff({
   file,
   commentingEnabled,
+  inlineComments,
+  onDeleteComment,
   onSubmitComment,
   scrollLineRef,
 }: SideBySideDiffProps): React.JSX.Element {
   const [expansions, setExpansions] = useState<Map<number, RegionExpansion>>(() => new Map())
   const [pending, setPending] = useState<PendingRange | null>(null)
   const [composer, setComposer] = useState<{ start: number; end: number | null } | null>(null)
+  const [commentHeights, setCommentHeights] = useState<Map<string, number>>(() => new Map())
+  const [rowHeightPx, setRowHeightPx] = useState<number>(() => ROW_HEIGHT_REM * getRootFontSizePx())
   const lineRefsRef = useRef<Map<number, HTMLDivElement>>(new Map())
+  const observerRef = useRef<ResizeObserver | null>(null)
+  const elToCommentRef = useRef<Map<Element, string>>(new Map())
 
   const handleExpandTop = useCallback((regionIndex: number): void => {
     setExpansions((prev) => {
@@ -96,6 +118,75 @@ export function SideBySideDiff({
   )
 
   const { rows } = useHighlightedDiff(file, expansions)
+
+  // Re-measure row pixel height on font-size changes (rare, but cheap).
+  useEffect(() => {
+    setRowHeightPx(ROW_HEIGHT_REM * getRootFontSizePx())
+  }, [])
+
+  // Drop measured heights for comments that have left the inline list so the
+  // map doesn't grow unbounded across re-projections.
+  useEffect(() => {
+    setCommentHeights((prev) => {
+      const ids = new Set(inlineComments.map((c) => c.comment.id))
+      let changed = false
+      const next = new Map<string, number>()
+      for (const [id, h] of prev) {
+        if (ids.has(id)) next.set(id, h)
+        else changed = true
+      }
+      return changed ? next : prev
+    })
+  }, [inlineComments])
+
+  // Single ResizeObserver per diff. Cards register their element via the ref
+  // callback below; height changes feed back into commentHeights state, which
+  // re-runs the layout pass.
+  useEffect(() => {
+    const elMap = elToCommentRef.current
+    const obs = new ResizeObserver((entries) => {
+      setCommentHeights((prev) => {
+        let changed = false
+        const next = new Map(prev)
+        for (const entry of entries) {
+          const id = elMap.get(entry.target)
+          if (!id) continue
+          const h = entry.contentRect.height
+          if (next.get(id) !== h) {
+            next.set(id, h)
+            changed = true
+          }
+        }
+        return changed ? next : prev
+      })
+    })
+    observerRef.current = obs
+    return () => {
+      obs.disconnect()
+      observerRef.current = null
+      elMap.clear()
+    }
+  }, [])
+
+  const registerCard = useCallback(
+    (id: string) =>
+      (el: HTMLDivElement | null): void => {
+        const obs = observerRef.current
+        if (!obs) return
+        const elMap = elToCommentRef.current
+        for (const [prevEl, prevId] of elMap) {
+          if (prevId === id && prevEl !== el) {
+            obs.unobserve(prevEl)
+            elMap.delete(prevEl)
+          }
+        }
+        if (el) {
+          elMap.set(el, id)
+          obs.observe(el)
+        }
+      },
+    [],
+  )
 
   // Mouseup anywhere finalizes a pending drag into the composer state.
   // Listening at window-level handles mouseups outside the diff.
@@ -155,46 +246,62 @@ export function SideBySideDiff({
     return `${(String(max).length + 1).toString()}ch`
   }, [rows])
 
-  /**
-   * Compute positions for absolutely-positioned collapse bars.
-   *
-   * Each paired row occupies 1 row height. Each collapsed region occupies
-   * (1 + stickyLines.length) row heights (1 for the control row, plus one
-   * per sticky context line). We walk the rows array to compute cumulative
-   * vertical offsets so each collapse bar can be positioned with `top`.
-   */
-  const collapsedBars = useMemo(() => {
-    const bars: {
-      topRows: number
-      heightRows: number
-      count: number
-      regionIndex: number
-      stickyLines: HighlightedStickyLine[]
-    }[] = []
-    let rowOffset = 0
-    for (const row of rows) {
-      if (row.kind === "collapsed") {
-        const heightRows = 1 + row.stickyLines.length
-        bars.push({
-          topRows: rowOffset,
-          heightRows,
-          count: row.count,
-          regionIndex: row.regionIndex,
-          stickyLines: row.stickyLines,
-        })
-        rowOffset += heightRows
-      } else {
-        rowOffset += 1
-      }
+  const commentsByAnchorLine = useMemo(() => {
+    const map = new Map<number, Comment[]>()
+    for (const ic of inlineComments) {
+      const list = map.get(ic.anchorLine)
+      if (list) list.push(ic.comment)
+      else map.set(ic.anchorLine, [ic.comment])
     }
-    return bars
-  }, [rows])
+    return map
+  }, [inlineComments])
+
+  const commentsById = useMemo(() => {
+    const map = new Map<string, Comment>()
+    for (const ic of inlineComments) map.set(ic.comment.id, ic.comment)
+    return map
+  }, [inlineComments])
+
+  const layout = useMemo(
+    () =>
+      computeDiffLayout({
+        rows,
+        commentsByAnchorLine,
+        commentHeights,
+        rowHeightPx,
+      }),
+    [rows, commentsByAnchorLine, commentHeights, rowHeightPx],
+  )
 
   // While the composer is open, also highlight the locked-in range visually.
   const lockedRange: PendingRange | null = composer
     ? { anchor: composer.start, current: composer.end ?? composer.start }
     : null
   const highlightRange = pending ?? lockedRange
+
+  const renderColumnSlot = useCallback(
+    (
+      slot: (typeof layout.slots)[number],
+      render: (rowIndex: number) => React.ReactNode,
+    ): React.ReactNode => {
+      switch (slot.kind) {
+        case "row":
+          return render(slot.rowIndex)
+        case "collapsed":
+          return (
+            <div
+              key={`spacer-${slot.regionIndex.toString()}`}
+              style={{ height: `${slot.heightPx.toString()}px` }}
+            />
+          )
+        case "commentSpacer":
+          return (
+            <div key={`cs-${slot.commentId}`} style={{ height: `${slot.heightPx.toString()}px` }} />
+          )
+      }
+    },
+    [],
+  )
 
   return (
     <div className="flex flex-col border border-border">
@@ -217,122 +324,65 @@ export function SideBySideDiff({
       {/*
        * IMPORTANT: Single 4-column layout for synchronized horizontal scrolling.
        *
-       * All rows (code + collapsed spacers) are rendered in ONE set of 4 columns.
-       * This ensures all "before" code shares one overflow-x-auto container and
-       * all "after" code shares another — scrolling horizontally in one code
-       * region scrolls ALL code in that column together.
+       * All rows (code + collapsed spacers + comment spacers) are rendered in
+       * ONE set of 4 columns. This ensures all "before" code shares one
+       * overflow-x-auto container and all "after" code shares another —
+       * scrolling horizontally in one code region scrolls ALL code in that
+       * column together.
        *
        * DO NOT split into per-segment columns. That breaks scroll synchronization
        * because each segment gets its own independent scroll container.
        *
-       * Collapsed regions are spacer divs in each column. The actual collapse bar
-       * UI is absolutely positioned over them (outside column flow) so it can
-       * span the full width without disrupting column alignment.
+       * Collapse bars and inline comment cards are absolutely positioned over
+       * 0-flow spacers in the columns (the spacer reserves vertical space; the
+       * absolute element spans full width).
        */}
       <div className="relative text-xs leading-5">
         <div className="flex">
           {/* Left gutter — fixed width, no horizontal scroll */}
           <div className="shrink-0" style={{ minWidth: gutterWidth }}>
-            {rows.map((row, i) =>
-              row.kind === "collapsed" ? (
-                /* Spacer: reserves vertical space for the absolutely positioned collapse bar */
-                <div
-                  key={`spacer-${row.regionIndex.toString()}`}
-                  style={{
-                    height: `${((1 + row.stickyLines.length) * ROW_HEIGHT_REM).toString()}rem`,
-                  }}
-                />
-              ) : (
-                <div
-                  key={i.toString()}
-                  className={cn(
-                    "h-5 select-none px-2 text-right",
-                    codeCellBg(row.left),
-                    gutterText(row.left),
-                  )}
-                >
-                  {row.left?.lineNo ?? ""}
-                </div>
-              ),
+            {layout.slots.map((slot, i) =>
+              renderColumnSlot(slot, (rowIndex) => {
+                const row = rows[rowIndex]
+                if (!row || row.kind !== "paired") return null
+                return (
+                  <div
+                    key={i.toString()}
+                    className={cn(
+                      "h-5 select-none px-2 text-right",
+                      codeCellBg(row.left),
+                      gutterText(row.left),
+                    )}
+                  >
+                    {row.left?.lineNo ?? ""}
+                  </div>
+                )
+              }),
             )}
           </div>
 
           {/* Left code (before) — single overflow-x-auto for ALL left-side code */}
           <div className="min-w-0 flex-1 overflow-x-auto">
-            {/* w-fit: stretches to widest line. min-w-full: at least as wide as
-                the visible area. This ensures row backgrounds (add/delete highlights)
-                cover the full scrollable width, not just each line's own content. */}
             <div className="min-w-full w-fit">
-              {rows.map((row, i) =>
-                row.kind === "collapsed" ? (
-                  <div
-                    key={`spacer-${row.regionIndex.toString()}`}
-                    style={{
-                      height: `${((1 + row.stickyLines.length) * ROW_HEIGHT_REM).toString()}rem`,
-                    }}
-                  />
-                ) : (
-                  <CodeCell key={i.toString()} line={row.left} />
-                ),
+              {layout.slots.map((slot, i) =>
+                renderColumnSlot(slot, (rowIndex) => {
+                  const row = rows[rowIndex]
+                  if (!row || row.kind !== "paired") return null
+                  return <CodeCell key={i.toString()} line={row.left} />
+                }),
               )}
             </div>
           </div>
 
-          {/* Right gutter — fixed width, no horizontal scroll */}
+          {/* Right gutter */}
           <div className="shrink-0" style={{ minWidth: gutterWidth }}>
-            {rows.map((row, i) =>
-              row.kind === "collapsed" ? (
-                <div
-                  key={`spacer-${row.regionIndex.toString()}`}
-                  style={{
-                    height: `${((1 + row.stickyLines.length) * ROW_HEIGHT_REM).toString()}rem`,
-                  }}
-                />
-              ) : (
-                <div
-                  key={i.toString()}
-                  onMouseDown={
-                    commentingEnabled && row.right?.lineNo
-                      ? handleLineMouseDown(row.right.lineNo)
-                      : undefined
-                  }
-                  onMouseEnter={
-                    commentingEnabled && row.right?.lineNo
-                      ? handleLineMouseEnter(row.right.lineNo)
-                      : undefined
-                  }
-                  className={cn(
-                    "h-5 select-none px-2 text-right",
-                    codeCellBg(row.right),
-                    gutterText(row.right),
-                    lineInPending(row.right?.lineNo, highlightRange) && "bg-purple-500/30",
-                    commentingEnabled &&
-                      row.right?.lineNo &&
-                      "cursor-pointer hover:bg-purple-500/20",
-                  )}
-                >
-                  {row.right?.lineNo ?? ""}
-                </div>
-              ),
-            )}
-          </div>
-
-          {/* Right code (after) — single overflow-x-auto for ALL right-side code */}
-          <div className="min-w-0 flex-1 overflow-x-auto">
-            <div className="min-w-full w-fit">
-              {rows.map((row, i) =>
-                row.kind === "collapsed" ? (
+            {layout.slots.map((slot, i) =>
+              renderColumnSlot(slot, (rowIndex) => {
+                const row = rows[rowIndex]
+                if (!row || row.kind !== "paired") return null
+                return (
                   <div
-                    key={`spacer-${row.regionIndex.toString()}`}
-                    style={{
-                      height: `${((1 + row.stickyLines.length) * ROW_HEIGHT_REM).toString()}rem`,
-                    }}
-                  />
-                ) : (
-                  <CodeCell
                     key={i.toString()}
-                    line={row.right}
-                    pending={lineInPending(row.right?.lineNo, highlightRange)}
                     onMouseDown={
                       commentingEnabled && row.right?.lineNo
                         ? handleLineMouseDown(row.right.lineNo)
@@ -343,38 +393,75 @@ export function SideBySideDiff({
                         ? handleLineMouseEnter(row.right.lineNo)
                         : undefined
                     }
-                    registerRef={
-                      row.right?.lineNo
-                        ? (el) => {
-                            const lineNo = row.right?.lineNo
-                            if (lineNo == null) return
-                            if (el) lineRefsRef.current.set(lineNo, el)
-                            else lineRefsRef.current.delete(lineNo)
-                          }
-                        : undefined
-                    }
-                  />
-                ),
+                    className={cn(
+                      "h-5 select-none px-2 text-right",
+                      codeCellBg(row.right),
+                      gutterText(row.right),
+                      lineInPending(row.right?.lineNo, highlightRange) && "bg-purple-500/30",
+                      commentingEnabled &&
+                        row.right?.lineNo &&
+                        "cursor-pointer hover:bg-purple-500/20",
+                    )}
+                  >
+                    {row.right?.lineNo ?? ""}
+                  </div>
+                )
+              }),
+            )}
+          </div>
+
+          {/* Right code (after) */}
+          <div className="min-w-0 flex-1 overflow-x-auto">
+            <div className="min-w-full w-fit">
+              {layout.slots.map((slot, i) =>
+                renderColumnSlot(slot, (rowIndex) => {
+                  const row = rows[rowIndex]
+                  if (!row || row.kind !== "paired") return null
+                  return (
+                    <CodeCell
+                      key={i.toString()}
+                      line={row.right}
+                      pending={lineInPending(row.right?.lineNo, highlightRange)}
+                      onMouseDown={
+                        commentingEnabled && row.right?.lineNo
+                          ? handleLineMouseDown(row.right.lineNo)
+                          : undefined
+                      }
+                      onMouseEnter={
+                        commentingEnabled && row.right?.lineNo
+                          ? handleLineMouseEnter(row.right.lineNo)
+                          : undefined
+                      }
+                      registerRef={
+                        row.right?.lineNo
+                          ? (el) => {
+                              const lineNo = row.right?.lineNo
+                              if (lineNo == null) return
+                              if (el) lineRefsRef.current.set(lineNo, el)
+                              else lineRefsRef.current.delete(lineNo)
+                            }
+                          : undefined
+                      }
+                    />
+                  )
+                }),
               )}
             </div>
           </div>
         </div>
 
         {/*
-         * Collapse bars — absolutely positioned over the spacer regions.
-         *
-         * These must be position:absolute (not in the column flow) because they
-         * span the full width of the diff and contain their own internal layout
-         * (gutter + label + sticky lines). If they were in-flow inside the
-         * columns, they'd break the 4-column alignment.
+         * Collapse bars — absolutely positioned over the spacer regions. Pixel
+         * `top` values come from the layout pass so they account for any
+         * comment cards above them.
          */}
-        {collapsedBars.map((bar) => (
+        {layout.collapsedBars.map((bar) => (
           <div
             key={`bar-${bar.regionIndex.toString()}`}
             className="absolute left-0 right-0 z-[5] flex flex-col border-y border-border bg-background"
             style={{
-              top: `${(bar.topRows * ROW_HEIGHT_REM).toString()}rem`,
-              height: `${(bar.heightRows * ROW_HEIGHT_REM).toString()}rem`,
+              top: `${bar.topPx.toString()}px`,
+              height: `${bar.heightPx.toString()}px`,
             }}
           >
             <div className="flex h-5 items-center">
@@ -422,6 +509,24 @@ export function SideBySideDiff({
             ))}
           </div>
         ))}
+
+        {/* Inline comment cards — absolute, full-width, ResizeObserver feeds
+         * height back into commentHeights state so the spacer in each column
+         * matches and rows below shift accordingly. */}
+        {layout.commentOverlays.map(({ commentId, topPx }) => {
+          const c = commentsById.get(commentId)
+          if (!c) return null
+          return (
+            <div
+              key={`comment-${commentId}`}
+              ref={registerCard(commentId)}
+              className="absolute left-0 right-0 z-[5]"
+              style={{ top: `${topPx.toString()}px` }}
+            >
+              <InlineCommentCard comment={c} onDelete={() => onDeleteComment(commentId)} />
+            </div>
+          )
+        })}
       </div>
 
       {composer && (

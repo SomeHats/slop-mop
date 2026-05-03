@@ -1,8 +1,10 @@
 import { Loader2 } from "lucide-react"
-import { useEffect, useImperativeHandle, useRef } from "react"
+import { useEffect, useImperativeHandle, useMemo, useRef } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import type { CommentWithProjection } from "@/features/comments/use-session-comments"
 import type { FileDiff, Selection, SessionCommit } from "@/lib/types"
-import { SideBySideDiff } from "./side-by-side-diff"
+import { commentAnchorLine } from "./diff-layout"
+import { type InlineComment, SideBySideDiff } from "./side-by-side-diff"
 
 export type DiffPanelHandle = {
   /** Scroll the right-side `lineNo` of `filePath` into view. Returns true on success. */
@@ -15,6 +17,8 @@ type DiffPanelProps = {
   selection: Selection | null
   commits: SessionCommit[]
   commentingEnabled: boolean
+  comments: CommentWithProjection[]
+  onDeleteComment: (id: string) => void
   onSubmitComment?:
     | ((
         filePath: string,
@@ -32,6 +36,8 @@ export function DiffPanel({
   selection,
   commits,
   commentingEnabled,
+  comments,
+  onDeleteComment,
   onSubmitComment,
   handleRef,
 }: DiffPanelProps): React.JSX.Element {
@@ -70,6 +76,23 @@ export function DiffPanel({
     }
     return ref
   }
+
+  // Group projected comments by file. Only `located` projections are inlined;
+  // orphaned ones stay sidebar-only. The `path` from the projection wins on
+  // rename, otherwise we fall back to the comment's anchor file path.
+  const inlineCommentsByFile = useMemo(() => {
+    const map = new Map<string, InlineComment[]>()
+    for (const { comment, projection } of comments) {
+      if (projection?.kind !== "located") continue
+      const path = projection.path ?? comment.file_path
+      const anchorLine = commentAnchorLine(projection.end, projection.start)
+      const list = map.get(path)
+      const entry: InlineComment = { comment, anchorLine }
+      if (list) list.push(entry)
+      else map.set(path, [entry])
+    }
+    return map
+  }, [comments])
 
   if (!selection) {
     return (
@@ -117,6 +140,8 @@ export function DiffPanel({
             key={file.path}
             file={file}
             commentingEnabled={commentingEnabled}
+            inlineComments={inlineCommentsByFile.get(file.path) ?? []}
+            onDeleteComment={onDeleteComment}
             onSubmitComment={onSubmitComment}
             scrollLineRef={refForFile(file.path)}
           />

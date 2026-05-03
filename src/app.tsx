@@ -189,6 +189,10 @@ function ProjectApp({
                 selection={selection}
                 commits={session.commits}
                 commentingEnabled={commentingEnabled}
+                comments={sessionComments.comments}
+                onDeleteComment={(id) => {
+                  void sessionComments.remove(id)
+                }}
                 onSubmitComment={handleSubmitComment}
                 handleRef={diffPanelRef}
               />
