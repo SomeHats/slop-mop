@@ -61,6 +61,7 @@ pub fn run() {
             comments::list_comments,
             comments::delete_comment,
             comments::project_comments,
+            comments::anchor_for_workdir,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

@@ -17,20 +17,33 @@ export type InlineComment = {
   anchorLine: number
 }
 
+/** Result of resolving a clicked diff range to a real (commit_hash, line, line)
+ *  anchor. `ok: false` means the range can't be anchored (typically because it
+ *  contains lines that exist only uncommitted in workdir). */
+export type ResolvedAnchor =
+  | { ok: true; commit_hash: string; start: number; end: number | null }
+  | { ok: false }
+
 export type SideBySideDiffProps = {
   file: FileDiff
   /** When true, right-side context/addition lines are click + drag commentable. */
   commentingEnabled: boolean
+  /** Resolves a clicked workdir range to a (commit_hash, lines) anchor. In
+   *  commit mode this is synchronous-feeling (the parent returns the selection
+   *  hash directly). In workdir mode it round-trips to the backend to translate
+   *  workdir lines to HEAD lines and reject uncommitted-added ranges. */
+  resolveAnchor: (filePath: string, start: number, end: number | null) => Promise<ResolvedAnchor>
   /** Comments rendered inline under their anchor line. Already filtered to
    *  this file and to projections that resolved (not orphaned). */
   inlineComments: InlineComment[]
   onDeleteComment: (id: string) => void
-  /** Called when the user submits the composer for the current selection. */
+  /** Called when the user submits the composer with a resolved anchor. */
   onSubmitComment?:
     | ((
         filePath: string,
-        rangeStart: number,
-        rangeEnd: number | null,
+        anchorCommit: string,
+        lineStart: number,
+        lineEnd: number | null,
         contents: string,
       ) => Promise<void> | void)
     | undefined
@@ -74,9 +87,20 @@ function getRootFontSizePx(): number {
   return Number.isFinite(n) && n > 0 ? n : 16
 }
 
+type ComposerState = {
+  /** Right-side line numbers — used for visual placement (highlight + overlay anchor). */
+  viewStart: number
+  viewEnd: number | null
+  /** Resolved immutable anchor — what we actually submit. */
+  commitHash: string
+  start: number
+  end: number | null
+}
+
 export function SideBySideDiff({
   file,
   commentingEnabled,
+  resolveAnchor,
   inlineComments,
   onDeleteComment,
   onSubmitComment,
@@ -84,7 +108,12 @@ export function SideBySideDiff({
 }: SideBySideDiffProps): React.JSX.Element {
   const [expansions, setExpansions] = useState<Map<number, RegionExpansion>>(() => new Map())
   const [pending, setPending] = useState<PendingRange | null>(null)
-  const [composer, setComposer] = useState<{ start: number; end: number | null } | null>(null)
+  /** While we await `resolveAnchor`, hold the range for the visual highlight only. */
+  const [validatingRange, setValidatingRange] = useState<{
+    start: number
+    end: number | null
+  } | null>(null)
+  const [composer, setComposer] = useState<ComposerState | null>(null)
   const [commentHeights, setCommentHeights] = useState<Map<string, number>>(() => new Map())
   const [rowHeightPx, setRowHeightPx] = useState<number>(() => ROW_HEIGHT_REM * getRootFontSizePx())
   const lineRefsRef = useRef<Map<number, HTMLDivElement>>(new Map())
@@ -194,21 +223,45 @@ export function SideBySideDiff({
     [],
   )
 
-  // Mouseup anywhere finalizes a pending drag into the composer state.
-  // Listening at window-level handles mouseups outside the diff.
+  // Mouseup anywhere finalizes a pending drag. Resolve the anchor before
+  // opening the composer so we never let the user write a comment on a line
+  // they can't anchor to. Listening at window-level handles mouseups outside
+  // the diff.
   useEffect(() => {
     if (!pending) return
     const onUp = (): void => {
       setPending((p) => {
         if (!p) return null
         const { start, end } = rangeBounds(p)
-        setComposer({ start, end })
+        setValidatingRange({ start, end })
+        void resolveAnchor(file.path, start, end).then(
+          (result) => {
+            setValidatingRange(null)
+            if (!result.ok) {
+              window.alert(
+                "Can't comment on lines added uncommitted in workdir — there's no commit to anchor against.",
+              )
+              return
+            }
+            setComposer({
+              viewStart: start,
+              viewEnd: end,
+              commitHash: result.commit_hash,
+              start: result.start,
+              end: result.end,
+            })
+          },
+          (e) => {
+            setValidatingRange(null)
+            console.error("[creche] resolveAnchor failed", e)
+          },
+        )
         return null
       })
     }
     window.addEventListener("mouseup", onUp)
     return () => window.removeEventListener("mouseup", onUp)
-  }, [pending])
+  }, [pending, resolveAnchor, file.path])
 
   // Scroll-to-line: imperatively scrolls a right-side line into view.
   useEffect(() => {
@@ -255,7 +308,9 @@ export function SideBySideDiff({
   // Composer participates in the same overlay/spacer machinery as committed
   // comments via a sentinel id. When present, it appears as the *last* item on
   // its anchor line (so it sits below any existing comments on that same line).
-  const composerAnchorLine = composer ? (composer.end ?? composer.start) : null
+  // Uses the right-side `viewStart`/`viewEnd` for placement, not the resolved
+  // (possibly-translated) anchor line numbers.
+  const composerAnchorLine = composer ? (composer.viewEnd ?? composer.viewStart) : null
 
   const commentsByAnchorLine = useMemo(() => {
     const map = new Map<number, Comment[]>()
@@ -270,8 +325,8 @@ export function SideBySideDiff({
         session_id: "",
         commit_hash: "",
         file_path: file.path,
-        range_start: composer?.start ?? composerAnchorLine,
-        range_end: composer?.end ?? null,
+        range_start: composer?.viewStart ?? composerAnchorLine,
+        range_end: composer?.viewEnd ?? null,
         contents: "",
         created_at: "",
       }
@@ -299,11 +354,18 @@ export function SideBySideDiff({
     [rows, commentsByAnchorLine, commentHeights, rowHeightPx],
   )
 
-  // While the composer is open, also highlight the locked-in range visually.
+  // Visual highlight: in priority — current drag, in-flight validation, then
+  // an open composer.
   const lockedRange: PendingRange | null = composer
-    ? { anchor: composer.start, current: composer.end ?? composer.start }
+    ? { anchor: composer.viewStart, current: composer.viewEnd ?? composer.viewStart }
     : null
-  const highlightRange = pending ?? lockedRange
+  const validatingPending: PendingRange | null = validatingRange
+    ? {
+        anchor: validatingRange.start,
+        current: validatingRange.end ?? validatingRange.start,
+      }
+    : null
+  const highlightRange = pending ?? validatingPending ?? lockedRange
 
   const renderColumnSlot = useCallback(
     (
@@ -550,12 +612,18 @@ export function SideBySideDiff({
                 style={{ top: `${topPx.toString()}px` }}
               >
                 <CommentComposer
-                  rangeStart={composer.start}
-                  rangeEnd={composer.end}
+                  rangeStart={composer.viewStart}
+                  rangeEnd={composer.viewEnd}
                   onCancel={() => setComposer(null)}
                   onSubmit={async (contents) => {
                     if (onSubmitComment) {
-                      await onSubmitComment(file.path, composer.start, composer.end, contents)
+                      await onSubmitComment(
+                        file.path,
+                        composer.commitHash,
+                        composer.start,
+                        composer.end,
+                        contents,
+                      )
                     }
                     setComposer(null)
                   }}

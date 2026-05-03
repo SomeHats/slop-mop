@@ -5,13 +5,14 @@ import { ChatSidebar } from "./features/chat/chat-sidebar"
 import { CommentsPanel } from "./features/comments/comments-panel"
 import { useSessionComments } from "./features/comments/use-session-comments"
 import { DiffPanel, type DiffPanelHandle } from "./features/diff/diff-panel"
+import type { ResolvedAnchor } from "./features/diff/side-by-side-diff"
 import { ProjectPicker } from "./features/projects/project-picker"
 import { TerminalPanel } from "./features/terminal/terminal-panel"
 import { useClaudeSession } from "./hooks/use-claude-session"
 import { useDiffStats } from "./hooks/use-diff-stats"
 import { useFullscreen } from "./hooks/use-fullscreen"
 import { useRangeDiff } from "./hooks/use-range-diff"
-import { createComment, startWatching } from "./lib/tauri"
+import { anchorForWorkdir, createComment, startWatching } from "./lib/tauri"
 import type { Selection } from "./lib/types"
 
 const project = window.__PROJECT
@@ -67,28 +68,50 @@ function ProjectApp({
   const sessionComments = useSessionComments(projectPath, session.sessionId, selection)
   const diffPanelRef = useRef<DiffPanelHandle | null>(null)
 
-  // Comment creation is only available when the diff is anchored to a real
-  // commit (selection.newer is a hash). The button-disable upstream enforces
-  // this; the early-return below is a safety net.
+  // Resolve a clicked workdir range to a real (commit_hash, line_start, line_end)
+  // anchor. In commit mode this is just the selection's `newer` hash + the
+  // right-side line numbers. In workdir mode we round-trip to the backend to
+  // translate workdir lines to HEAD lines, rejecting lines that exist only
+  // uncommitted (no immutable anchor).
+  const handleResolveAnchor = useCallback(
+    async (filePath: string, start: number, end: number | null): Promise<ResolvedAnchor> => {
+      if (selection?.newer) {
+        return { ok: true, commit_hash: selection.newer, start, end }
+      }
+      const result = await anchorForWorkdir(projectPath, filePath, start, end)
+      if (result.kind === "anchored") {
+        return {
+          ok: true,
+          commit_hash: result.commit_hash,
+          start: result.line_start,
+          end: result.line_end,
+        }
+      }
+      return { ok: false }
+    },
+    [projectPath, selection],
+  )
+
   const handleSubmitComment = useCallback(
     async (
       filePath: string,
-      rangeStart: number,
-      rangeEnd: number | null,
+      anchorCommit: string,
+      lineStart: number,
+      lineEnd: number | null,
       contents: string,
     ): Promise<void> => {
-      if (!session.sessionId || !selection?.newer) return
+      if (!session.sessionId) return
       const created = await createComment({
         sessionId: session.sessionId,
-        commitHash: selection.newer,
+        commitHash: anchorCommit,
         filePath,
-        rangeStart,
-        rangeEnd,
+        rangeStart: lineStart,
+        rangeEnd: lineEnd,
         contents,
       })
       sessionComments.add(created)
     },
-    [session.sessionId, selection, sessionComments.add],
+    [session.sessionId, sessionComments.add],
   )
 
   const handleJumpToComment = useCallback(
@@ -109,7 +132,10 @@ function ProjectApp({
   )
 
   const showTerminal = selection === null
-  const commentingEnabled = !showTerminal && selection !== null && selection.newer !== null
+  // Workdir-inclusive views (selection.newer === null) are commentable too —
+  // anchor resolution happens lazily per-click via handleResolveAnchor, which
+  // rejects lines that exist only uncommitted.
+  const commentingEnabled = !showTerminal && selection !== null
   // The `claude --resume` picker doesn't offer a "start new session" option, so we
   // overlay our own button while the user hasn't picked a session yet. Once the
   // SessionStart hook fires (either pick from picker, or our restart-without-resume),
@@ -193,6 +219,7 @@ function ProjectApp({
                 onDeleteComment={(id) => {
                   void sessionComments.remove(id)
                 }}
+                resolveAnchor={handleResolveAnchor}
                 onSubmitComment={handleSubmitComment}
                 handleRef={diffPanelRef}
               />

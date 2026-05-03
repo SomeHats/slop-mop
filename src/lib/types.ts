@@ -95,3 +95,12 @@ export type ProjectedComment = {
   comment_id: string
   result: ProjectionResult
 }
+
+/**
+ * Result of resolving a workdir line range to an immutable HEAD anchor for a
+ * new comment. `Uncommittable` means at least one line in the range was added
+ * in workdir and therefore has no HEAD counterpart to anchor against.
+ */
+export type AnchorForWorkdir =
+  | { kind: "anchored"; commit_hash: string; line_start: number; line_end: number | null }
+  | { kind: "uncommittable" }

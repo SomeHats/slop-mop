@@ -4,7 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import type { CommentWithProjection } from "@/features/comments/use-session-comments"
 import type { FileDiff, Selection, SessionCommit } from "@/lib/types"
 import { commentAnchorLine } from "./diff-layout"
-import { type InlineComment, SideBySideDiff } from "./side-by-side-diff"
+import { type InlineComment, type ResolvedAnchor, SideBySideDiff } from "./side-by-side-diff"
 
 export type DiffPanelHandle = {
   /** Scroll the right-side `lineNo` of `filePath` into view. Returns true on success. */
@@ -19,11 +19,13 @@ type DiffPanelProps = {
   commentingEnabled: boolean
   comments: CommentWithProjection[]
   onDeleteComment: (id: string) => void
+  resolveAnchor: (filePath: string, start: number, end: number | null) => Promise<ResolvedAnchor>
   onSubmitComment?:
     | ((
         filePath: string,
-        rangeStart: number,
-        rangeEnd: number | null,
+        anchorCommit: string,
+        lineStart: number,
+        lineEnd: number | null,
         contents: string,
       ) => Promise<void> | void)
     | undefined
@@ -38,6 +40,7 @@ export function DiffPanel({
   commentingEnabled,
   comments,
   onDeleteComment,
+  resolveAnchor,
   onSubmitComment,
   handleRef,
 }: DiffPanelProps): React.JSX.Element {
@@ -140,6 +143,7 @@ export function DiffPanel({
             key={file.path}
             file={file}
             commentingEnabled={commentingEnabled}
+            resolveAnchor={resolveAnchor}
             inlineComments={inlineCommentsByFile.get(file.path) ?? []}
             onDeleteComment={onDeleteComment}
             onSubmitComment={onSubmitComment}

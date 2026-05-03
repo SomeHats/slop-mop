@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core"
 import type {
+  AnchorForWorkdir,
   Comment,
   DiffStats,
   FileDiff,
@@ -103,5 +104,19 @@ export function projectComments(
     projectPath,
     commentIds,
     targetCommit,
+  })
+}
+
+export function anchorForWorkdir(
+  projectPath: string,
+  filePath: string,
+  workdirStart: number,
+  workdirEnd: number | null,
+): Promise<AnchorForWorkdir> {
+  return invoke<AnchorForWorkdir>("anchor_for_workdir", {
+    projectPath,
+    filePath,
+    workdirStart,
+    workdirEnd,
   })
 }

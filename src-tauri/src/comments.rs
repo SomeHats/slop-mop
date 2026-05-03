@@ -65,6 +65,21 @@ pub struct ProjectedComment {
     pub result: ProjectionResult,
 }
 
+/// Result of resolving a workdir line range against HEAD. Workdir-mode comments
+/// must anchor against an immutable commit; HEAD is the most recent one
+/// containing the line. Lines added since HEAD (uncommitted) have no anchor and
+/// are rejected.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AnchorForWorkdir {
+    Anchored {
+        commit_hash: String,
+        line_start: u32,
+        line_end: Option<u32>,
+    },
+    Uncommittable,
+}
+
 // ─── Pure projection ──────────────────────────────────────────────────────────
 
 /// Project a 1-based line range from the anchor file's coordinate system into
@@ -277,6 +292,158 @@ fn matched_delta_idx(diff: &git2::Diff<'_>, target: &git2::DiffDelta<'_>) -> Opt
     })
 }
 
+// ─── Workdir → HEAD line translation ──────────────────────────────────────────
+
+/// One hunk of a `HEAD → workdir` diff for a single file. `new_to_old[i]` is the
+/// HEAD line number for workdir line `new_start + i` when that line is context
+/// (origin ' '), or `None` when the line was added in workdir (origin '+').
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct WorkdirHunk {
+    new_start: u32,
+    new_lines: u32,
+    old_lines: u32,
+    new_to_old: Vec<Option<u32>>,
+}
+
+/// Coarse classification of a file in the `HEAD → workdir` diff. Used to short-
+/// circuit the line-walk when the file is wholly new or unchanged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum WorkdirFile {
+    /// The file is unchanged from HEAD; workdir line == HEAD line.
+    Identity,
+    /// The file is new in workdir (untracked or staged-add) — every line is uncommitted.
+    EntirelyAdded,
+    /// Normal modified file with hunks.
+    Modified(Vec<WorkdirHunk>),
+}
+
+fn collect_workdir_file(
+    repo: &Repository,
+    head_hash: &str,
+    file_path: &str,
+) -> Result<WorkdirFile, Error> {
+    let head_tree = commit_tree(repo, head_hash)?;
+
+    let mut opts = DiffOptions::new();
+    opts.include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .context_lines(0);
+
+    let mut diff = repo
+        .diff_tree_to_workdir_with_index(Some(&head_tree), Some(&mut opts))
+        .map_err(Error::Git)?;
+
+    let mut find_opts = DiffFindOptions::new();
+    find_opts.renames(true).copies(true);
+    diff.find_similar(Some(&mut find_opts)).map_err(Error::Git)?;
+
+    let mut found_idx: Option<usize> = None;
+    let mut found_status: Option<Delta> = None;
+    for (idx, delta) in diff.deltas().enumerate() {
+        let new_path = delta
+            .new_file()
+            .path()
+            .map(|p| p.to_string_lossy().into_owned());
+        if new_path.as_deref() == Some(file_path) {
+            found_idx = Some(idx);
+            found_status = Some(delta.status());
+            break;
+        }
+    }
+
+    let Some(target_idx) = found_idx else {
+        return Ok(WorkdirFile::Identity);
+    };
+
+    match found_status {
+        Some(Delta::Added) | Some(Delta::Untracked) => return Ok(WorkdirFile::EntirelyAdded),
+        Some(Delta::Deleted) => {
+            // The user can't be commenting on a workdir line of a file that
+            // doesn't exist in workdir; surface as Uncommittable upstream.
+            return Ok(WorkdirFile::EntirelyAdded);
+        }
+        _ => {}
+    }
+
+    use std::cell::RefCell;
+    let hunks: RefCell<Vec<WorkdirHunk>> = RefCell::new(Vec::new());
+
+    diff.foreach(
+        &mut |_, _| true,
+        None,
+        Some(&mut |delta, hunk| {
+            if matched_delta_idx(&diff, &delta) != Some(target_idx) {
+                return true;
+            }
+            let new_lines = hunk.new_lines();
+            hunks.borrow_mut().push(WorkdirHunk {
+                new_start: hunk.new_start(),
+                new_lines,
+                old_lines: hunk.old_lines(),
+                new_to_old: vec![None; new_lines as usize],
+            });
+            true
+        }),
+        Some(&mut |delta, _hunk_opt, line| {
+            if matched_delta_idx(&diff, &delta) != Some(target_idx) {
+                return true;
+            }
+            let origin = line.origin();
+            if origin != ' ' && origin != '+' {
+                return true;
+            }
+            let Some(new_no) = line.new_lineno() else {
+                return true;
+            };
+            let mut hs = hunks.borrow_mut();
+            let Some(last) = hs.last_mut() else {
+                return true;
+            };
+            if new_no < last.new_start {
+                return true;
+            }
+            let pos = (new_no - last.new_start) as usize;
+            if pos >= last.new_to_old.len() {
+                return true;
+            }
+            if origin == ' ' {
+                last.new_to_old[pos] = line.old_lineno();
+            }
+            // origin '+' leaves new_to_old[pos] as None (uncommitted addition).
+            true
+        }),
+    )
+    .map_err(Error::Git)?;
+
+    Ok(WorkdirFile::Modified(hunks.into_inner()))
+}
+
+/// Translate a workdir line number into its HEAD line number, or None if the
+/// line was added in workdir (no HEAD counterpart).
+fn workdir_to_head_line(file: &WorkdirFile, line: u32) -> Option<u32> {
+    match file {
+        WorkdirFile::Identity => Some(line),
+        WorkdirFile::EntirelyAdded => None,
+        WorkdirFile::Modified(hunks) => {
+            // offset = workdir - head, accumulated from hunks fully before `line`.
+            let mut offset: i64 = 0;
+            for h in hunks {
+                if line < h.new_start {
+                    let v = line as i64 - offset;
+                    return if v >= 1 { Some(v as u32) } else { None };
+                }
+                if line < h.new_start + h.new_lines {
+                    let pos = (line - h.new_start) as usize;
+                    return h.new_to_old[pos];
+                }
+                offset += h.new_lines as i64 - h.old_lines as i64;
+            }
+            let v = line as i64 - offset;
+            if v >= 1 { Some(v as u32) } else { None }
+        }
+    }
+}
+
 // ─── Tauri commands ───────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -390,6 +557,70 @@ pub fn project_comments(
         });
     }
     Ok(results)
+}
+
+/// Resolve a workdir line range to an immutable `(commit_hash, line_start, line_end)`
+/// anchor by translating workdir lines back to their HEAD positions. Returns
+/// `Uncommittable` if any line in the range was added in workdir (no HEAD
+/// counterpart). Used by the frontend when opening the comment composer in a
+/// workdir-inclusive view.
+#[tauri::command]
+pub fn anchor_for_workdir(
+    project_path: String,
+    file_path: String,
+    workdir_start: u32,
+    workdir_end: Option<u32>,
+) -> Result<AnchorForWorkdir, Error> {
+    if workdir_start < 1 {
+        return Err(Error::InvalidPath(format!(
+            "workdir_start must be >= 1, got {workdir_start}"
+        )));
+    }
+    if let Some(end) = workdir_end {
+        if end < workdir_start {
+            return Err(Error::InvalidPath(format!(
+                "workdir_end ({end}) must be >= workdir_start ({workdir_start})"
+            )));
+        }
+    }
+
+    let repo = Repository::discover(Path::new(&project_path))
+        .map_err(|_| Error::NotAGitRepo(project_path.clone()))?;
+
+    let head_commit = repo
+        .head()
+        .and_then(|h| h.peel_to_commit())
+        .map_err(Error::Git)?;
+    let head_hash = head_commit.id().to_string();
+
+    let workdir_file = collect_workdir_file(&repo, &head_hash, &file_path)?;
+
+    let high = workdir_end.unwrap_or(workdir_start);
+    let mut head_start: Option<u32> = None;
+    let mut head_end: Option<u32> = None;
+
+    for line in workdir_start..=high {
+        match workdir_to_head_line(&workdir_file, line) {
+            Some(head_line) => {
+                if line == workdir_start {
+                    head_start = Some(head_line);
+                }
+                if line == high {
+                    head_end = Some(head_line);
+                }
+            }
+            None => return Ok(AnchorForWorkdir::Uncommittable),
+        }
+    }
+
+    let line_start = head_start.expect("range has at least one line");
+    let line_end = workdir_end.and(head_end);
+
+    Ok(AnchorForWorkdir::Anchored {
+        commit_hash: head_hash,
+        line_start,
+        line_end,
+    })
 }
 
 fn row_to_comment(row: &rusqlite::Row<'_>) -> rusqlite::Result<Comment> {
@@ -829,6 +1060,193 @@ mod tests {
              VALUES (?1, 's', 'h', 'p', ?2, ?3, 'c')",
             rusqlite::params![id, range_start, range_end],
         )
+    }
+
+    // ─── Workdir → HEAD translation tests ─────────────────────────────────
+
+    fn workdir_hunk(
+        new_start: u32,
+        new_lines: u32,
+        old_lines: u32,
+        new_to_old: Vec<Option<u32>>,
+    ) -> WorkdirHunk {
+        WorkdirHunk {
+            new_start,
+            new_lines,
+            old_lines,
+            new_to_old,
+        }
+    }
+
+    #[test]
+    fn workdir_to_head_identity_returns_input() {
+        assert_eq!(workdir_to_head_line(&WorkdirFile::Identity, 7), Some(7));
+    }
+
+    #[test]
+    fn workdir_to_head_entirely_added_is_uncommittable() {
+        assert_eq!(workdir_to_head_line(&WorkdirFile::EntirelyAdded, 1), None);
+        assert_eq!(workdir_to_head_line(&WorkdirFile::EntirelyAdded, 99), None);
+    }
+
+    #[test]
+    fn workdir_to_head_outside_hunk_uses_offset() {
+        // 3 lines added at the top: workdir 10 → head 7.
+        let file = WorkdirFile::Modified(vec![workdir_hunk(1, 3, 0, vec![None, None, None])]);
+        assert_eq!(workdir_to_head_line(&file, 10), Some(7));
+    }
+
+    #[test]
+    fn workdir_to_head_addition_inside_hunk_returns_none() {
+        // Hunk: workdir lines 5..=7 are all additions.
+        let file = WorkdirFile::Modified(vec![workdir_hunk(5, 3, 0, vec![None, None, None])]);
+        assert_eq!(workdir_to_head_line(&file, 6), None);
+    }
+
+    #[test]
+    fn workdir_to_head_context_inside_hunk_uses_recorded_old() {
+        // workdir [5..=7]: position 0 is addition, position 1 is context (head 5),
+        // position 2 is addition.
+        let file = WorkdirFile::Modified(vec![workdir_hunk(5, 3, 1, vec![None, Some(5), None])]);
+        assert_eq!(workdir_to_head_line(&file, 6), Some(5));
+        assert_eq!(workdir_to_head_line(&file, 5), None);
+        assert_eq!(workdir_to_head_line(&file, 7), None);
+    }
+
+    #[test]
+    fn workdir_to_head_after_pure_deletion_shifts_up() {
+        // Pure deletion in HEAD→workdir: 2 lines removed at head [5..=6].
+        // new_lines = 0, old_lines = 2, no entries.
+        let file = WorkdirFile::Modified(vec![workdir_hunk(5, 0, 2, vec![])]);
+        // workdir line 10 → head 12.
+        assert_eq!(workdir_to_head_line(&file, 10), Some(12));
+    }
+
+    #[test]
+    fn integration_anchor_workdir_context_line() {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("a.txt"), ten_lines()).unwrap();
+        let _c1 = make_commit(&repo, "c1");
+
+        // Modify workdir: prepend 2 lines (uncommitted).
+        let mut content = String::new();
+        content.push_str("w1\nw2\n");
+        content.push_str(&ten_lines());
+        fs::write(dir.path().join("a.txt"), content).unwrap();
+
+        // Comment on workdir line 5 ("line 3" in HEAD).
+        let r = anchor_for_workdir(
+            dir.path().to_string_lossy().into_owned(),
+            "a.txt".into(),
+            5,
+            None,
+        )
+        .unwrap();
+        match r {
+            AnchorForWorkdir::Anchored {
+                line_start,
+                line_end,
+                ..
+            } => {
+                assert_eq!(line_start, 3);
+                assert_eq!(line_end, None);
+            }
+            AnchorForWorkdir::Uncommittable => panic!("expected Anchored"),
+        }
+    }
+
+    #[test]
+    fn integration_anchor_workdir_addition_is_uncommittable() {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("a.txt"), ten_lines()).unwrap();
+        let _c1 = make_commit(&repo, "c1");
+
+        // Prepend 2 lines uncommitted.
+        let mut content = String::new();
+        content.push_str("w1\nw2\n");
+        content.push_str(&ten_lines());
+        fs::write(dir.path().join("a.txt"), content).unwrap();
+
+        // workdir line 1 is an uncommitted addition ("w1").
+        let r = anchor_for_workdir(
+            dir.path().to_string_lossy().into_owned(),
+            "a.txt".into(),
+            1,
+            None,
+        )
+        .unwrap();
+        assert_eq!(r, AnchorForWorkdir::Uncommittable);
+    }
+
+    #[test]
+    fn integration_anchor_workdir_range_crossing_addition_is_uncommittable() {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("a.txt"), ten_lines()).unwrap();
+        let _c1 = make_commit(&repo, "c1");
+
+        let mut content = String::new();
+        content.push_str("w1\nw2\n");
+        content.push_str(&ten_lines());
+        fs::write(dir.path().join("a.txt"), content).unwrap();
+
+        // Range [1, 5] spans both additions and a context line.
+        let r = anchor_for_workdir(
+            dir.path().to_string_lossy().into_owned(),
+            "a.txt".into(),
+            1,
+            Some(5),
+        )
+        .unwrap();
+        assert_eq!(r, AnchorForWorkdir::Uncommittable);
+    }
+
+    #[test]
+    fn integration_anchor_workdir_unchanged_file_is_identity() {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("a.txt"), ten_lines()).unwrap();
+        let _c1 = make_commit(&repo, "c1");
+
+        // No workdir changes — file is identical to HEAD.
+        let r = anchor_for_workdir(
+            dir.path().to_string_lossy().into_owned(),
+            "a.txt".into(),
+            7,
+            None,
+        )
+        .unwrap();
+        match r {
+            AnchorForWorkdir::Anchored {
+                line_start,
+                line_end,
+                ..
+            } => {
+                assert_eq!(line_start, 7);
+                assert_eq!(line_end, None);
+            }
+            AnchorForWorkdir::Uncommittable => panic!("expected Anchored"),
+        }
+    }
+
+    #[test]
+    fn integration_anchor_workdir_untracked_file_is_uncommittable() {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("seed.txt"), "x\n").unwrap();
+        let _c1 = make_commit(&repo, "c1");
+
+        fs::write(dir.path().join("new.txt"), "hello\nworld\n").unwrap();
+        let r = anchor_for_workdir(
+            dir.path().to_string_lossy().into_owned(),
+            "new.txt".into(),
+            1,
+            None,
+        )
+        .unwrap();
+        assert_eq!(r, AnchorForWorkdir::Uncommittable);
     }
 
     #[test]
