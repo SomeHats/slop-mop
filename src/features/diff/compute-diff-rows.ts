@@ -135,13 +135,29 @@ export function computeStickyLines(
     })
   }
 
-  // The last entry is the innermost line at the bottom of the hidden region,
-  // not an enclosing scope opener — drop it.
-  return stack.slice(0, -1).map((entry) => ({
-    content: entry.content,
-    lineNo: entry.lineNo,
-    offsetFromTop: entry.offset,
-  }))
+  // Drop stack entries whose scope isn't still open at the boundary. We compare
+  // against the indent of the first non-blank visible row after the hidden
+  // region: an entry at indent >= that boundary indent has already closed (or
+  // is itself the boundary line), so it's not an enclosing scope. If there's
+  // no visible row after (region runs to EOF), every entry is an opener.
+  let boundaryIndent = Number.POSITIVE_INFINITY
+  for (let i = endIndex; i < rows.length; i++) {
+    const row = rows[i]
+    if (row?.kind !== "paired") continue
+    const line = row.left ?? row.right
+    if (!line) continue
+    if (line.content.trim() === "") continue
+    boundaryIndent = measureIndent(line.content)
+    break
+  }
+
+  return stack
+    .filter((entry) => entry.indent < boundaryIndent)
+    .map((entry) => ({
+      content: entry.content,
+      lineNo: entry.lineNo,
+      offsetFromTop: entry.offset,
+    }))
 }
 
 /**
