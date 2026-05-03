@@ -153,7 +153,7 @@ pub fn spawn_claude(
                         {
                             "type": "command",
                             "command": format!(
-                                "curl -sS --max-time 30 -X POST '{prompt_hook_url}' --data-binary @-"
+                                "curl -sS --max-time 120 -X POST '{prompt_hook_url}' --data-binary @-"
                             )
                         }
                     ]
@@ -177,7 +177,7 @@ pub fn spawn_claude(
                         {
                             "type": "command",
                             "command": format!(
-                                "curl -sS --max-time 30 -X POST '{stop_hook_url}' --data-binary @-"
+                                "curl -sS --max-time 600 -X POST '{stop_hook_url}' --data-binary @-"
                             )
                         }
                     ]
