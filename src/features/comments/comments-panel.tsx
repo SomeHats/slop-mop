@@ -68,6 +68,9 @@ export function CommentsPanel({
         "flex max-h-1/2 shrink-0 flex-col overflow-hidden border-t border-border bg-background",
         className,
       )}
+      // Layout containment so checkbox toggles inside don't invalidate the
+      // sibling diff panel's layout tree.
+      style={{ contain: "layout style" }}
       data-testid="comments-panel"
     >
       <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">

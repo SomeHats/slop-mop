@@ -392,7 +392,20 @@ function SideBySideDiffInner({
   )
 
   return (
-    <div className="flex flex-col border border-border">
+    <div
+      className="flex flex-col border border-border"
+      // `contain: layout style` isolates this card from its siblings and from
+      // the comments panel — toggling a checkbox elsewhere can't invalidate
+      // this subtree's layout. `content-visibility: auto` lets the browser
+      // skip layout/paint entirely while the file is offscreen; the intrinsic
+      // size hint stops the scroll position from jumping when content
+      // suddenly materializes on scroll.
+      style={{
+        contain: "layout style",
+        contentVisibility: "auto",
+        containIntrinsicSize: "auto 600px",
+      }}
+    >
       <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-background px-3 py-1.5">
         <span className="flex-1 truncate text-xs font-medium text-foreground">{file.path}</span>
         <Badge variant={STATUS_VARIANTS[file.status] ?? "secondary"} className="text-[10px]">
