@@ -1,10 +1,10 @@
 [package]
-name = "claude-creche"
+name = "slop-mop"
 version = "0.0.1"
 edition = "2021"
 
 [lib]
-name = "claude_creche_lib"
+name = "slop_mop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

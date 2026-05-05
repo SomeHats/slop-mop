@@ -137,7 +137,7 @@ pub fn spawn_claude(
     let server = Arc::new(server);
 
     // 2. Write temp settings.json with UserPromptSubmit + SessionStart hooks.
-    let settings_path = std::env::temp_dir().join(format!("claude-creche-{agent_id}.json"));
+    let settings_path = std::env::temp_dir().join(format!("slop-mop-{agent_id}.json"));
     let prompt_hook_url =
         format!("http://127.0.0.1:{hook_port}/prompt?project_id={project_id}&agent_id={agent_id}");
     let session_hook_url = format!(
@@ -631,7 +631,7 @@ fn handle_stop_inner(
         }
     };
     // Trailing blank line is load-bearing: without it, a single-line `Prompt: …`
-    // sits in the same paragraph as the appended `Creche-Session-Id` trailer,
+    // sits in the same paragraph as the appended `Slop-Mop-Session-Id` trailer,
     // and git's interpret-trailers treats `Prompt:` as a trailer too. The blank
     // line forces the appended trailer into its own block.
     let full_message = format!("{generated}\n\nPrompt: {prompt}\n\n");

@@ -73,7 +73,7 @@ export function ProjectPicker(): React.JSX.Element {
       <div className="flex flex-1 items-center justify-center">
         <div className="flex w-full max-w-md flex-col gap-6 p-8">
           <div className="text-center">
-            <h1 className="text-3xl font-bold tracking-tight">Claude Crèche</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Slop Mop</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Open a git repository to get started.
             </p>

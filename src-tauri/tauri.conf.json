@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Claude Crèche",
+  "productName": "Slop Mop",
   "version": "0.0.1",
-  "identifier": "com.claude-creche.desktop",
+  "identifier": "com.slop-mop.desktop",
   "build": {
     "beforeBuildCommand": "pnpm build:frontend",
     "beforeDevCommand": "pnpm dev:vite",
@@ -17,7 +17,7 @@
     "windows": [
       {
         "label": "picker",
-        "title": "Claude Crèche",
+        "title": "Slop Mop",
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "trafficLightPosition": { "x": 12, "y": 16 },

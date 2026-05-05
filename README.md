@@ -1,4 +1,4 @@
-# Claude Crèche
+# Slop Mop
 
 A Tauri v2 desktop app for managing multiple Claude Code agent instances working
 on a shared codebase.

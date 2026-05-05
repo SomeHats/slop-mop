@@ -13,7 +13,7 @@ pub fn open_picker_window(app: &AppHandle) -> Result<(), Error> {
     }
 
     WebviewWindowBuilder::new(app, "picker", WebviewUrl::default())
-        .title("Claude Crèche")
+        .title("Slop Mop")
         .title_bar_style(tauri::TitleBarStyle::Overlay)
         .hidden_title(true)
         .traffic_light_position(tauri::LogicalPosition::new(12.0, 16.0))

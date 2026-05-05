@@ -3,7 +3,7 @@ use std::process::Command;
 
 use crate::error::Error;
 
-pub const SESSION_TRAILER_KEY: &str = "Creche-Session-Id";
+pub const SESSION_TRAILER_KEY: &str = "Slop-Mop-Session-Id";
 pub const CHECKPOINT_SUBJECT: &str = "check point";
 
 pub fn get_head_commit_hash(path: &Path) -> Result<String, Error> {
@@ -33,7 +33,7 @@ pub fn stage_all_and_check_dirty(cwd: &Path) -> Result<bool, String> {
     Ok(!diff.success())
 }
 
-/// Commit with a `Creche-Session-Id` trailer. Tries with the user's hooks
+/// Commit with a `Slop-Mop-Session-Id` trailer. Tries with the user's hooks
 /// first (so pre-commit formatters etc. run normally), and falls back to
 /// `--no-verify` if that fails — a hook is allowed to gate real commits but
 /// shouldn't block our checkpoints. Always passes `--no-gpg-sign` to avoid

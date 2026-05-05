@@ -253,7 +253,7 @@ function SideBySideDiffInner({
           },
           (e) => {
             setValidatingRange(null)
-            console.error("[creche] resolveAnchor failed", e)
+            console.error("[slop-mop] resolveAnchor failed", e)
           },
         )
         return null

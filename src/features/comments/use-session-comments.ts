@@ -77,7 +77,7 @@ export function useSessionComments(
       (loaded) => {
         if (!cancelled) setComments(loaded)
       },
-      (e) => console.error("[creche] listComments failed", e),
+      (e) => console.error("[slop-mop] listComments failed", e),
     )
     return () => {
       cancelled = true
@@ -101,7 +101,7 @@ export function useSessionComments(
         for (const r of results) map.set(r.comment_id, r.result)
         setProjections(map)
       },
-      (e) => console.error("[creche] projectComments failed", e),
+      (e) => console.error("[slop-mop] projectComments failed", e),
     )
   }, [projectPath, selection, comments])
 
@@ -122,7 +122,7 @@ export function useSessionComments(
         for (const r of results) map.set(r.comment_id, r.result)
         setWorkdirProjections(map)
       },
-      (e) => console.error("[creche] projectComments (workdir) failed", e),
+      (e) => console.error("[slop-mop] projectComments (workdir) failed", e),
     )
   }, [projectPath, comments])
 

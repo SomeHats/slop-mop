@@ -27,7 +27,7 @@ pub fn run() {
                 .app_data_dir()
                 .expect("failed to resolve app data dir");
             std::fs::create_dir_all(&data_dir).expect("failed to create app data dir");
-            let db_path = data_dir.join("creche.db");
+            let db_path = data_dir.join("slop-mop.db");
             let database = db::Db::open(&db_path).expect("failed to open database");
             app.manage(database);
             app.manage(claude::ClaudeManager::new());

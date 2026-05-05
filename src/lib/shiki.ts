@@ -32,7 +32,7 @@ export const palette = {
 } as const
 
 const theme: ThemeRegistration = {
-  name: "claude-creche",
+  name: "slop-mop",
   type: "dark",
   colors: {
     "editor.background": "#00000000",
@@ -190,8 +190,7 @@ export async function highlightTokens(
 ): Promise<ThemedToken[][] | null> {
   const h = await getHighlighter()
   try {
-    return h.codeToTokens(code, { lang: language as BundledLanguage, theme: "claude-creche" })
-      .tokens
+    return h.codeToTokens(code, { lang: language as BundledLanguage, theme: "slop-mop" }).tokens
   } catch {
     return null
   }

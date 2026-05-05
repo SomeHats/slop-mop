@@ -333,27 +333,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e4de3bc4ea267985becf712dc6d9eed8b04c953b3fcfb339ebc87acd9804901"
 
 [[package]]
-name = "claude-creche"
-version = "0.0.1"
-dependencies = [
- "base64 0.22.1",
- "git2",
- "notify",
- "notify-debouncer-mini",
- "portable-pty",
- "rusqlite",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tempfile",
- "thiserror 2.0.18",
- "tiny_http",
- "uuid",
-]
-
-[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3445,6 +3424,27 @@ name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
+
+[[package]]
+name = "slop-mop"
+version = "0.0.1"
+dependencies = [
+ "base64 0.22.1",
+ "git2",
+ "notify",
+ "notify-debouncer-mini",
+ "portable-pty",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tiny_http",
+ "uuid",
+]
 
 [[package]]
 name = "smallvec"

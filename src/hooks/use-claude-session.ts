@@ -76,7 +76,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
 
     void (async () => {
       try {
-        console.log("[creche] spawning claude", { spawnSeq, resumeMode })
+        console.log("[slop-mop] spawning claude", { spawnSeq, resumeMode })
         const result = await spawnClaude(projectPath, _projectId, resumeMode)
         if (cancelled) {
           void killClaude(result.agent_id)
@@ -101,7 +101,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
           source: SessionStartSource
         }>("session-started", (evt) => {
           if (evt.payload.agent_id !== agentIdRef.current) return
-          console.log("[creche] session-started", evt.payload)
+          console.log("[slop-mop] session-started", evt.payload)
           setSessionId(evt.payload.session_id)
           setSessionSource(evt.payload.source)
           // Seed history from git log for this session.
@@ -111,7 +111,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
                 setCommits(loaded)
               }
             },
-            (e) => console.error("[creche] listSessionCommits failed", e),
+            (e) => console.error("[slop-mop] listSessionCommits failed", e),
           )
         })
         unlisteners.push(sessionUnlisten)
@@ -148,7 +148,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
           timestamp_unix: number
         }>("prompt-committed", (evt) => {
           if (evt.payload.agent_id !== agentIdRef.current) return
-          console.log("[creche] prompt-committed", evt.payload)
+          console.log("[slop-mop] prompt-committed", evt.payload)
           const commit: SessionCommit = {
             commit_hash: evt.payload.commit_hash,
             session_id: evt.payload.session_id,

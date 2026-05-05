@@ -18,7 +18,7 @@ pub fn build_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
 
     let menu = Menu::with_items(app, &[
         #[cfg(target_os = "macos")]
-        &SubmenuBuilder::new(app, app.config().product_name.as_deref().unwrap_or("Claude Crèche"))
+        &SubmenuBuilder::new(app, app.config().product_name.as_deref().unwrap_or("Slop Mop"))
             .about(None)
             .separator()
             .hide()
