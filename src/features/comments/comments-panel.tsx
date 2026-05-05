@@ -1,6 +1,7 @@
 import { Trash2 } from "lucide-react"
 import { useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import type { ProjectionResult } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -10,10 +11,14 @@ import type { CommentWithProjection } from "./use-session-comments"
 export type CommentsPanelProps = {
   comments: CommentWithProjection[]
   staged: Set<string>
+  /** True while the agent is mid-turn — disables submission. */
+  isAgentBusy: boolean
   /** Flip a single comment's staged state. */
   onToggleStaged: (commentId: string) => void
   /** Stage (true) or unstage (false) every sendable comment. */
   onToggleAllStaged: (checked: boolean) => void
+  /** Submit the staged batch to the agent. */
+  onSubmit: () => void
   /** Called when the user clicks a comment row. Implementer decides whether
    *  to scroll the diff in place or navigate the selection. */
   onJump: (commentId: string) => void
@@ -34,8 +39,10 @@ function reasonText(p: ProjectionResult | null): string {
 export function CommentsPanel({
   comments,
   staged,
+  isAgentBusy,
   onToggleStaged,
   onToggleAllStaged,
+  onSubmit,
   onJump,
   onDelete,
   className,
@@ -82,6 +89,26 @@ export function CommentsPanel({
         />
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
           Comments ({comments.length})
+        </span>
+        <span
+          className="ml-auto"
+          title={
+            stagedSendableCount === 0
+              ? "No comments staged"
+              : isAgentBusy
+                ? "Agent is working…"
+                : undefined
+          }
+        >
+          <Button
+            type="button"
+            size="sm"
+            disabled={stagedSendableCount === 0 || isAgentBusy}
+            onClick={onSubmit}
+            className="h-6 px-2 text-[10px]"
+          >
+            Send ({stagedSendableCount})
+          </Button>
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">

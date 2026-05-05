@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { ChatSidebar } from "./features/chat/chat-sidebar"
 import { CommentsPanel } from "./features/comments/comments-panel"
+import { formatCommentsForSubmit } from "./features/comments/submit-comments"
 import { useSessionComments } from "./features/comments/use-session-comments"
 import { DiffPanel, type DiffPanelHandle } from "./features/diff/diff-panel"
 import type { ResolvedAnchor } from "./features/diff/side-by-side-diff"
@@ -99,6 +100,21 @@ function ProjectApp({
     [sessionComments.remove],
   )
 
+  const handleSubmitStaged = useCallback((): void => {
+    if (session.isBusy) return // belt-and-braces; the button is also disabled
+    const { ids, items } = sessionComments.prepareSubmit()
+    if (items.length === 0) return
+    const text = formatCommentsForSubmit(items)
+    // Ctrl-S (0x13) tells Claude Code to stash whatever the user has half-typed
+    // in its input box, leaving the input empty for our payload.
+    session.writeInput(new Uint8Array([0x13]))
+    // Then the formatted comments + Carriage Return to submit, the same
+    // sequence xterm produces when the user hits Enter.
+    session.writeInput(new TextEncoder().encode(`${text}\r`))
+    // Drop sent comments. `remove` also clears them from the staged set.
+    for (const id of ids) void sessionComments.remove(id)
+  }, [session.isBusy, session.writeInput, sessionComments.prepareSubmit, sessionComments.remove])
+
   const handleSubmitComment = useCallback(
     async (
       filePath: string,
@@ -182,8 +198,10 @@ function ProjectApp({
             <CommentsPanel
               comments={sessionComments.comments}
               staged={sessionComments.staged}
+              isAgentBusy={session.isBusy}
               onToggleStaged={sessionComments.toggleStaged}
               onToggleAllStaged={sessionComments.setAllStaged}
+              onSubmit={handleSubmitStaged}
               onJump={handleJumpToComment}
               onDelete={handleDeleteComment}
             />

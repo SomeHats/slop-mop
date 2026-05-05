@@ -23,6 +23,8 @@ export type ClaudeSession = {
   isConnecting: boolean
   /** True while one or more git commits are in flight (checkpoint or post-prompt). */
   isCommitting: boolean
+  /** True between UserPromptSubmit and Stop — i.e. while the agent is mid-turn. */
+  isBusy: boolean
   error: string | null
   /** Subscribe to PTY output bytes (base64-decoded). Returns an unsubscribe fn. */
   onOutput: (listener: (bytes: Uint8Array) => void) => () => void
@@ -61,6 +63,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
   const [spawnSeq, setSpawnSeq] = useState(0)
   const [isConnecting, setIsConnecting] = useState(true)
   const [committingCount, setCommittingCount] = useState(0)
+  const [isBusy, setIsBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const agentIdRef = useRef<string | null>(null)
@@ -124,6 +127,18 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
           setCommittingCount((n) => Math.max(0, n - 1))
         })
         unlisteners.push(finishedUnlisten)
+
+        const busyUnlisten = await listen<{ agent_id: string }>("agent-busy", (evt) => {
+          if (evt.payload.agent_id !== agentIdRef.current) return
+          setIsBusy(true)
+        })
+        unlisteners.push(busyUnlisten)
+
+        const idleUnlisten = await listen<{ agent_id: string }>("agent-idle", (evt) => {
+          if (evt.payload.agent_id !== agentIdRef.current) return
+          setIsBusy(false)
+        })
+        unlisteners.push(idleUnlisten)
 
         const committedUnlisten = await listen<{
           agent_id: string
@@ -199,6 +214,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     setAgentId(null)
     setCommits([])
     setCommittingCount(0)
+    setIsBusy(false)
     setIsConnecting(true)
     setSpawnSeq((s) => s + 1)
   }, [])
@@ -211,6 +227,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     resumeMode,
     isConnecting,
     isCommitting: committingCount > 0,
+    isBusy,
     error,
     onOutput,
     writeInput,

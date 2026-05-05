@@ -488,6 +488,18 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
 /// UserPromptSubmit: stash the prompt for the upcoming Stop, and commit any
 /// pre-existing uncommitted work as a "check point" so Claude's diff is clean.
 fn handle_prompt(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &serde_json::Value) {
+    // Mark the agent busy as soon as the prompt is in. Paired with the
+    // agent-idle emit at the tail of handle_stop. Frontend uses this to gate
+    // the "submit comments" button so we don't interleave inputs.
+    emit_to_window(
+        app,
+        window_label,
+        "agent-busy",
+        CommitStatusEvent {
+            agent_id: agent_id.to_string(),
+        },
+    );
+
     let session_id = parsed
         .get("session_id")
         .and_then(|v| v.as_str())
@@ -547,7 +559,26 @@ fn handle_prompt(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &s
 }
 
 /// Stop: commit Claude's changes (if any) with the prompt as the message.
+/// Wraps `handle_stop_inner` so the agent-idle emit fires no matter which
+/// early-return branch the inner function takes.
 fn handle_stop(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &serde_json::Value) {
+    handle_stop_inner(app, window_label, agent_id, parsed);
+    emit_to_window(
+        app,
+        window_label,
+        "agent-idle",
+        CommitStatusEvent {
+            agent_id: agent_id.to_string(),
+        },
+    );
+}
+
+fn handle_stop_inner(
+    app: &AppHandle,
+    window_label: &str,
+    agent_id: &str,
+    parsed: &serde_json::Value,
+) {
     let session_id = parsed
         .get("session_id")
         .and_then(|v| v.as_str())

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import * as tauri from "@/lib/tauri"
 import type { Comment, ProjectedComment, ProjectionResult, Selection } from "@/lib/types"
 import { allSendableIds, reconcileStaged, shouldAutoStageNew } from "./staging"
+import { commentForSubmit, type SubmittableComment } from "./submit-comments"
 
 export type CommentWithProjection = {
   comment: Comment
@@ -22,6 +23,10 @@ export type UseSessionCommentsResult = {
   setAllStaged: (checked: boolean) => void
   add: (comment: Comment) => void
   remove: (id: string) => Promise<void>
+  /** Snapshot the staged + sendable comments, formatted for submission. The
+   *  parent (which owns `writeInput`) is responsible for actually sending
+   *  them and then calling `remove` on each id. */
+  prepareSubmit: () => { ids: string[]; items: SubmittableComment[] }
   /** Resolve a comment id's currently-projected position, or null. */
   projectionFor: (id: string) => ProjectionResult | null
 }
@@ -163,6 +168,35 @@ export function useSessionComments(
     )
   }, [])
 
+  // Stable ref for prepareSubmit — `staged` changes every toggle and we don't
+  // want to rebuild the callback (which would invalidate App's `useCallback`
+  // dep on it).
+  const stagedRef = useRef<Set<string>>(staged)
+  useEffect(() => {
+    stagedRef.current = staged
+  }, [staged])
+
+  const prepareSubmit = useCallback((): { ids: string[]; items: SubmittableComment[] } => {
+    const stagedSet = stagedRef.current
+    const wp = workdirProjectionsRef.current
+    const ids: string[] = []
+    const items: SubmittableComment[] = []
+    // Iterate `comments` in display order so the formatted prompt mirrors
+    // what the user sees in the panel.
+    for (const c of commentsRef.current) {
+      if (!stagedSet.has(c.id)) continue
+      const item = commentForSubmit({
+        comment: c,
+        projection: null,
+        sessionProjection: wp.get(c.id) ?? null,
+      })
+      if (!item) continue
+      ids.push(c.id)
+      items.push(item)
+    }
+    return { ids, items }
+  }, [])
+
   const projectionFor = useCallback(
     (id: string): ProjectionResult | null => projections.get(id) ?? null,
     [projections],
@@ -178,5 +212,14 @@ export function useSessionComments(
     [comments, projections, workdirProjections],
   )
 
-  return { comments: merged, staged, toggleStaged, setAllStaged, add, remove, projectionFor }
+  return {
+    comments: merged,
+    staged,
+    toggleStaged,
+    setAllStaged,
+    add,
+    remove,
+    prepareSubmit,
+    projectionFor,
+  }
 }
