@@ -108,11 +108,16 @@ function ProjectApp({
     // Ctrl-S (0x13) tells Claude Code to stash whatever the user has half-typed
     // in its input box, leaving the input empty for our payload.
     session.writeInput(new Uint8Array([0x13]))
-    // Then the formatted comments + Carriage Return to submit, the same
-    // sequence xterm produces when the user hits Enter.
-    session.writeInput(new TextEncoder().encode(`${text}\r`))
+    // Then the formatted comments. We send the body and the submitting Enter
+    // as *separate* PTY writes with a delay between them: when text and \r
+    // land in one read() Claude treats it as a paste and the \r becomes part
+    // of the input buffer instead of a submit keypress.
+    session.writeInput(new TextEncoder().encode(text))
+    setTimeout(() => session.writeInput(new Uint8Array([0x0d])), 50)
     // Drop sent comments. `remove` also clears them from the staged set.
     for (const id of ids) void sessionComments.remove(id)
+    // Pop back to the terminal so the user sees the agent take the comments.
+    setSelection(null)
   }, [session.isBusy, session.writeInput, sessionComments.prepareSubmit, sessionComments.remove])
 
   const handleSubmitComment = useCallback(
