@@ -112,8 +112,9 @@ function ProjectApp({
     // as *separate* PTY writes with a delay between them: when text and \r
     // land in one read() Claude treats it as a paste and the \r becomes part
     // of the input buffer instead of a submit keypress.
-    session.writeInput(new TextEncoder().encode(text))
-    setTimeout(() => session.writeInput(new Uint8Array([0x0d])), 50)
+    const encoder = new TextEncoder()
+    session.writeInput(encoder.encode(text))
+    setTimeout(() => session.writeInput(encoder.encode("\r")), 50)
     // Drop sent comments. `remove` also clears them from the staged set.
     for (const id of ids) void sessionComments.remove(id)
     // Pop back to the terminal so the user sees the agent take the comments.
