@@ -39,12 +39,6 @@ Run the full app (Vite dev server + native Tauri window):
 pnpm dev
 ```
 
-Or run the frontend on its own in a browser, without the Rust backend (useful for poking at UI in isolation — most things will be broken since IPC calls fail):
-
-```sh
-pnpm dev:vite
-```
-
 ## Scripts
 
 | Script                  | What it does                                                 |
@@ -57,7 +51,7 @@ pnpm dev:vite
 | `pnpm test`             | Run TS + Rust tests                                          |
 | `pnpm test:ts`          | Vitest (frontend)                                            |
 | `pnpm test:rs`          | `cargo test` (backend)                                       |
-| `pnpm test:watch`       | Vitest in watch mode                                         |
+| `pnpm test:watch`       | Vitest in watch mode (frontend only — there's no Rust equivalent) |
 | `pnpm typecheck`        | `tsc -b` (no emit)                                           |
 | `pnpm check`            | Biome lint + format check                                    |
 | `pnpm check:fix`        | Biome with auto-fix                                          |
