@@ -1,13 +1,15 @@
 # 🪣🧹 Slop Mop
 
-An opinionated agentic programming tool for engineers who still care about the code. Slop Mop is a code review tool for working synchronously (ish) with agents, rather than asynchronously with colleagues.
+**An agentic programming tool for engineers who still care about the code.**
+
+Slop Mop is a code review tool for working synchronously (ish) with agents, rather than asynchronously with colleagues.
 
 Slop Mop is a small wrapper around Claude Code, implementing a specific workflow.
-1. Agent does the agent thing. **This part is the slop 🪣**
+1. **🪣 The slop:** the robot does the robot thing.
 2. Automatically make a git commit after each prompt
-3. View a diff of the last prompt, or a range of prompts (it's just git, after all)
-4. Review the diff, and leave comments as you go
-5. Send your comments all at once or in smaller batches, depending on how your agent works best. **This part is the mop 🧹**
+3. View a diff of the last prompt, or a range of prompts (it's just git, after all).
+4. Review the diff, and leave comments as you go.
+5. **🧹 The mop:** Send your comments all at once or in smaller batches, depending on how your agent works best.
 6. goto 1
 
 ![A screenshot of slop mop](screenshot.png)
