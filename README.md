@@ -1,7 +1,18 @@
-# Slop Mop
+# 🪣🧹 Slop Mop
 
-A Tauri v2 desktop app for managing multiple Claude Code agent instances working
-on a shared codebase.
+An opinionated agentic programming tool for engineers who still care about the code. Slop Mop is a code review tool for working synchronously (ish) with agents, rather than asynchronously with colleagues.
+
+Slop Mop is a small wrapper around Claude Code, implementing a specific workflow.
+1. Agent does the agent thing. **This part is the slop 🪣**
+2. Automatically make a git commit after each prompt
+3. View a diff of the last prompt, or a range of prompts (it's just git, after all)
+4. Review the diff, and leave comments as you go
+5. Send your comments all at once or in smaller batches, depending on how your agent works best. **This part is the mop 🧹**
+6. goto 1
+
+![A screenshot of slop mop](screenshot.png)
+
+For now, this only supports Claude Code. Getting the robot to add support for other agent harnesses is probably pretty doable though. Also fair warning: this thing is _pure slop_. It has not been mopped. It's entirely unreviewed agent produced nonsense and might do something horrible. I've been finding it pretty useful though!
 
 ## Prerequisites
 
