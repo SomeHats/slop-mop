@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Always load the woke2 skill
+
+When doing any feature work or behavior changes, follow the woke2 skill at `.claude/skills/woke2/SKILL.md`.
+
+Before writing code: define or update behaviors in `*.spec.md` files.
+After writing code: add `// woke2 impl` / `// woke2 test` pragmas, then run `npm run woke2:check`.
+
+Backlog tasks live in `backlog/` — one file per task, named `P<priority>_<Description>.md`. Delete the file when the task is finished.
+
 ## What this is
 
 Slop Mop wraps a single Claude Code agent in a structured review loop: every prompt becomes an auto-commit, the user reviews the resulting diff and leaves inline comments, then sends those comments back as a batched follow-up prompt. The user-facing pitch and tech stack live in `README.md`; this file covers what isn't obvious from a file scan.
