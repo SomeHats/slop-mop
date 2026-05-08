@@ -204,7 +204,7 @@ function ProjectApp({
         <h1 className="text-sm font-bold tracking-tight" title={projectPath}>
           {name}
         </h1>
-        <div className="ml-auto" data-tauri-no-drag-region="">
+        <div className="-my-1.5 -mr-2 ml-auto" data-tauri-no-drag-region="">
           <ProjectSettingsButton
             projectPath={projectPath}
             branchPrefixMode={projectSettings.branchPrefixMode}
