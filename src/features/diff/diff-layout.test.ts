@@ -44,6 +44,7 @@ function makeComment(id: string, line: number, lineEnd: number | null = null): C
   }
 }
 
+// woke2 test DV-LY1, DV-LY2, DV-LY3, DV-LY4
 describe("computeDiffLayout", () => {
   it("returns one slot per row when there are no comments", () => {
     const rows: HighlightedRow[] = [pairedRow(1, 1), pairedRow(2, 2), pairedRow(3, 3)]
