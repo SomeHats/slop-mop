@@ -93,6 +93,8 @@ export function TerminalPanel({ session, visible }: TerminalPanelProps): React.J
       }
     } else {
       try {
+        // woke2 impl TRM-V4
+        term.clearSelection()
         term.blur()
       } catch {
         // ignore

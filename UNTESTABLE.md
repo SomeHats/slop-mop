@@ -404,6 +404,7 @@ Terminal panel (xterm + ResizeObserver):
 - !TRM-V1 — kept in layout always
 - !TRM-V2 — refresh + focus on visible
 - !TRM-V3 — blur on hidden
+- !TRM-V4 — clearSelection on hidden: visual / xterm internals
 - !TRM-C1 — unmount cleanup
 
 Library bindings (lib/tauri.ts):

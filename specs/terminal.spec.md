@@ -30,6 +30,7 @@ The terminal embeds [xterm.js](https://xtermjs.org/) and pipes Claude's PTY outp
 - !TRM-V1 The terminal stays in layout (real dimensions) at all times, so visibility changes don't trigger a resize
 - !TRM-V2 When becoming visible, calls `term.refresh(0, rows-1)` to wake xterm's renderer and focuses the terminal
 - !TRM-V3 When hidden, blurs the terminal so keystrokes don't go to a hidden tab
+- !TRM-V4 When hidden, clears xterm's selection so selected text doesn't bleed visually over the diff view that's now on top
 
 ## Cleanup
 
