@@ -17,10 +17,10 @@ use tiny_http::{Method, Response, Server};
 use crate::db::Db;
 use crate::error::Error;
 use crate::git::{
-    commit_with_session_trailer, derive_branch_prefix, get_head_branch_name,
-    get_head_commit_hash, get_head_commit_message, stage_all_and_check_dirty,
+    commit_with_session_trailer, get_head_commit_hash, get_head_commit_message,
+    stage_all_and_check_dirty,
 };
-use crate::project::read_project_settings;
+use crate::project::current_prefix;
 
 /// The user's login shell, falling back to zsh.
 fn user_shell() -> String {
@@ -607,13 +607,15 @@ fn commit_staged_and_emit(
         }
     };
 
-    // The commit's first-line subject — possibly carrying a branch prefix.
-    // The sidebar strips the *current* prefix at display time, so old
-    // commits keep whatever prefix they were committed with.
-    let unprefixed_subject = first_line(&generated);
+    // Strip whatever prefix-like thing claude may have produced (`feat: …`,
+    // `alex/foo: …`, etc.) before applying our own — otherwise we'd end up
+    // double-prefixed like `alex/foo: feat: …`. Done unconditionally: even
+    // when our mode is `none`, we don't want claude sneakily picking a
+    // prefix for us.
+    let unprefixed_subject = strip_subject_prefix(&first_line(&generated)).to_string();
     let display_subject = match resolve_prefix(app, project_id, path) {
         Some(p) => format!("{p}: {unprefixed_subject}"),
-        None => unprefixed_subject,
+        None => unprefixed_subject.clone(),
     };
 
     // Trailing blank line is load-bearing: without it, a single-line
@@ -665,13 +667,102 @@ fn commit_staged_and_emit(
     eprintln!("[hook] commit emitted");
 }
 
-/// Resolve the branch prefix to apply for a given commit, if any. Returns
-/// `None` when settings can't be read, mode is `None`, or HEAD is detached.
+/// Thin wrapper around `project::current_prefix` that resolves the `Db`
+/// state from the `AppHandle` so callers in the hook flow don't have to.
 fn resolve_prefix(app: &AppHandle, project_id: &str, path: &Path) -> Option<String> {
     let db = app.try_state::<Db>()?;
-    let settings = read_project_settings(&db, project_id).ok()?;
-    let branch = get_head_branch_name(path)?;
-    derive_branch_prefix(&branch, settings.branch_prefix_mode)
+    current_prefix(&db, project_id, path)
+}
+
+/// Strip a leading conventional-commit-shaped prefix (`feat: `,
+/// `alex/foo: `, `Fix(scope is not allowed): foo`) from a subject line.
+/// We do this before applying our own branch prefix so claude's own
+/// prefixing habits don't compound with ours.
+///
+/// Pattern: one or more slug segments separated by `/`, followed by `: `.
+/// Slug segment: starts with an ASCII letter, followed by ASCII letters,
+/// digits, or `-`. Anything outside that grammar (parens, dots, spaces) is
+/// rejected and the subject returned unchanged.
+fn strip_subject_prefix(subject: &str) -> &str {
+    let Some(idx) = subject.find(": ") else {
+        return subject;
+    };
+    let candidate = &subject[..idx];
+    if candidate.is_empty() {
+        return subject;
+    }
+    let valid = candidate.split('/').all(is_slug_segment);
+    if valid {
+        // `: ` is two bytes; skip past it. Trim leading whitespace just in
+        // case claude added more than one space (unusual but cheap insurance).
+        subject[idx + 2..].trim_start()
+    } else {
+        subject
+    }
+}
+
+fn is_slug_segment(seg: &str) -> bool {
+    let mut chars = seg.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() => {
+            chars.all(|c| c.is_ascii_alphanumeric() || c == '-')
+        }
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_subject_prefix_handles_simple_prefix() {
+        assert_eq!(strip_subject_prefix("feat: foo"), "foo");
+        assert_eq!(strip_subject_prefix("Fix: foo"), "foo");
+    }
+
+    #[test]
+    fn strip_subject_prefix_handles_path_prefix() {
+        assert_eq!(strip_subject_prefix("alex/feature: foo"), "foo");
+        assert_eq!(strip_subject_prefix("alex/feature/sub: foo"), "foo");
+    }
+
+    #[test]
+    fn strip_subject_prefix_strips_only_first_match() {
+        assert_eq!(strip_subject_prefix("feat: foo: bar"), "foo: bar");
+    }
+
+    #[test]
+    fn strip_subject_prefix_rejects_non_slug_chars() {
+        // Parens, spaces, dots — leave alone.
+        assert_eq!(strip_subject_prefix("feat(scope): foo"), "feat(scope): foo");
+        assert_eq!(strip_subject_prefix("Update README: explain"), "Update README: explain");
+        assert_eq!(strip_subject_prefix("v1.2: release"), "v1.2: release");
+    }
+
+    #[test]
+    fn strip_subject_prefix_passes_through_unprefixed() {
+        assert_eq!(strip_subject_prefix("just a subject"), "just a subject");
+        assert_eq!(strip_subject_prefix(""), "");
+    }
+
+    #[test]
+    fn strip_subject_prefix_rejects_empty_or_leading_slash() {
+        // Empty prefix (`: foo`) — leave alone.
+        assert_eq!(strip_subject_prefix(": foo"), ": foo");
+        // Empty segment (`/foo: bar`) — leave alone (invalid path-prefix).
+        assert_eq!(strip_subject_prefix("/foo: bar"), "/foo: bar");
+        // Empty segment (`foo/: bar`) — leave alone.
+        assert_eq!(strip_subject_prefix("foo/: bar"), "foo/: bar");
+    }
+
+    #[test]
+    fn strip_subject_prefix_rejects_segment_starting_with_digit_or_hyphen() {
+        // 1foo isn't a valid slug (must start with a letter).
+        assert_eq!(strip_subject_prefix("1foo: bar"), "1foo: bar");
+        // Leading hyphen: also invalid.
+        assert_eq!(strip_subject_prefix("-foo: bar"), "-foo: bar");
+    }
 }
 
 /// Stop: commit Claude's changes (if any) with the prompt as the message.

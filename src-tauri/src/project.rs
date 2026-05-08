@@ -5,7 +5,7 @@ use tauri::State;
 
 use crate::db::Db;
 use crate::error::Error;
-use crate::git::{BranchPrefixMode, get_head_branch_name};
+use crate::git::{BranchPrefixMode, derive_branch_prefix, get_head_branch_name};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
@@ -170,4 +170,14 @@ pub fn update_project_settings(
 #[tauri::command]
 pub fn get_head_branch(project_path: String) -> Option<String> {
     get_head_branch_name(Path::new(&project_path))
+}
+
+/// Compute the prefix that *new* commits would carry given the project's
+/// current setting and current branch. Single source of truth for prefix
+/// derivation; both the commit path (claude.rs) and the sidebar seed
+/// (commits.rs) call this so they can't disagree.
+pub fn current_prefix(db: &Db, project_id: &str, path: &Path) -> Option<String> {
+    let settings = read_project_settings(db, project_id).ok()?;
+    let branch = get_head_branch_name(path)?;
+    derive_branch_prefix(&branch, settings.branch_prefix_mode)
 }

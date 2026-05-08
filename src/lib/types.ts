@@ -29,6 +29,13 @@ export type SessionCommit = {
   timestamp_unix: number
 }
 
+export type SessionCommitsResult = {
+  commits: SessionCommit[]
+  /** Prefix that new commits would carry given current settings + branch.
+   *  Used to strip matching prefixes off displayed subjects. */
+  current_prefix: string | null
+}
+
 /**
  * An inclusive selection over the timeline, with each end being either a
  * commit hash or `null` (the working tree / "Current Session" pseudo-node).

@@ -2,9 +2,12 @@ use std::path::Path;
 
 use git2::{Repository, message_trailers_strs};
 use serde::Serialize;
+use tauri::State;
 
+use crate::db::Db;
 use crate::error::Error;
 use crate::git::SESSION_TRAILER_KEY;
+use crate::project::current_prefix;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SessionCommit {
@@ -21,13 +24,24 @@ pub struct SessionCommit {
     pub timestamp_unix: i64,
 }
 
-#[tauri::command]
-pub fn list_session_commits(
-    project_path: String,
-    session_id: String,
+#[derive(Debug, Clone, Serialize)]
+pub struct SessionCommitsResult {
+    pub commits: Vec<SessionCommit>,
+    /// The branch-prefix that *new* commits would carry given the project's
+    /// current setting and current branch. The sidebar uses this to strip
+    /// matching prefixes off displayed subjects. `None` when no prefix
+    /// applies (mode=`none`, detached HEAD, or settings unreadable).
+    pub current_prefix: Option<String>,
+}
+
+/// Walk `git log` from HEAD and pull out commits carrying the given session
+/// trailer. Pure: no DB access, no app state — call directly in tests.
+fn walk_session_commits(
+    project_path: &str,
+    session_id: &str,
 ) -> Result<Vec<SessionCommit>, Error> {
-    let repo = Repository::discover(Path::new(&project_path))
-        .map_err(|_| Error::NotAGitRepo(project_path.clone()))?;
+    let repo = Repository::discover(Path::new(project_path))
+        .map_err(|_| Error::NotAGitRepo(project_path.to_string()))?;
 
     let mut walk = repo.revwalk().map_err(Error::Git)?;
     // Default sort = topology order from HEAD; no time-based buffering.
@@ -54,7 +68,7 @@ pub fn list_session_commits(
 
         out.push(SessionCommit {
             commit_hash: oid.to_string(),
-            session_id: session_id.clone(),
+            session_id: session_id.to_string(),
             prompt: subject,
             message: message.to_string(),
             timestamp_unix: commit.time().seconds(),
@@ -62,6 +76,21 @@ pub fn list_session_commits(
     }
 
     Ok(out)
+}
+
+#[tauri::command]
+pub fn list_session_commits(
+    db: State<'_, Db>,
+    project_id: String,
+    project_path: String,
+    session_id: String,
+) -> Result<SessionCommitsResult, Error> {
+    let commits = walk_session_commits(&project_path, &session_id)?;
+    let prefix = current_prefix(&db, &project_id, Path::new(&project_path));
+    Ok(SessionCommitsResult {
+        commits,
+        current_prefix: prefix,
+    })
 }
 
 #[cfg(test)]
@@ -112,11 +141,7 @@ mod tests {
             "subject C\n\nbody\n\nSlop-Mop-Session-Id: other\n",
         );
 
-        let out = list_session_commits(
-            dir.path().to_string_lossy().to_string(),
-            "sess1".to_string(),
-        )
-        .unwrap();
+        let out = walk_session_commits(&dir.path().to_string_lossy(), "sess1").unwrap();
 
         assert_eq!(out.len(), 2);
         // Newest first.

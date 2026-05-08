@@ -25,6 +25,11 @@ export type ClaudeSession = {
   isCommitting: boolean
   /** True between UserPromptSubmit and Stop — i.e. while the agent is mid-turn. */
   isBusy: boolean
+  /** Branch prefix Rust would apply to *new* commits given current settings.
+   *  Used by the sidebar to strip matching prefixes off displayed subjects.
+   *  Captured once at session-start; settings/branch changes mid-session do
+   *  not refresh it. */
+  currentPrefix: string | null
   error: string | null
   /** Subscribe to PTY output bytes (base64-decoded). Returns an unsubscribe fn. */
   onOutput: (listener: (bytes: Uint8Array) => void) => () => void
@@ -64,6 +69,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
   const [isConnecting, setIsConnecting] = useState(true)
   const [committingCount, setCommittingCount] = useState(0)
   const [isBusy, setIsBusy] = useState(false)
+  const [currentPrefix, setCurrentPrefix] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const agentIdRef = useRef<string | null>(null)
@@ -104,11 +110,14 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
           console.log("[slop-mop] session-started", evt.payload)
           setSessionId(evt.payload.session_id)
           setSessionSource(evt.payload.source)
-          // Seed history from git log for this session.
-          void listSessionCommits(projectPath, evt.payload.session_id).then(
+          // Seed history from git log for this session, and capture the
+          // current branch prefix so the sidebar can strip it from displayed
+          // subjects without re-deriving it client-side.
+          void listSessionCommits(_projectId, projectPath, evt.payload.session_id).then(
             (loaded) => {
               if (!cancelled && agentIdRef.current === evt.payload.agent_id) {
-                setCommits(loaded)
+                setCommits(loaded.commits)
+                setCurrentPrefix(loaded.current_prefix)
               }
             },
             (e) => console.error("[slop-mop] listSessionCommits failed", e),
@@ -217,6 +226,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     setCommits([])
     setCommittingCount(0)
     setIsBusy(false)
+    setCurrentPrefix(null)
     setIsConnecting(true)
     setSpawnSeq((s) => s + 1)
   }, [])
@@ -230,6 +240,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     isConnecting,
     isCommitting: committingCount > 0,
     isBusy,
+    currentPrefix,
     error,
     onOutput,
     writeInput,

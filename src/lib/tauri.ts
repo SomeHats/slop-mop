@@ -7,7 +7,7 @@ import type {
   Project,
   ProjectedComment,
   ProjectSettings,
-  SessionCommit,
+  SessionCommitsResult,
 } from "./types"
 
 export function openProject(path: string): Promise<Project> {
@@ -63,10 +63,15 @@ export function killClaude(agentId: string): Promise<void> {
 }
 
 export function listSessionCommits(
+  projectId: string,
   projectPath: string,
   sessionId: string,
-): Promise<SessionCommit[]> {
-  return invoke<SessionCommit[]>("list_session_commits", { projectPath, sessionId })
+): Promise<SessionCommitsResult> {
+  return invoke<SessionCommitsResult>("list_session_commits", {
+    projectId,
+    projectPath,
+    sessionId,
+  })
 }
 
 export function batchDiffStats(projectPath: string, commitHashes: string[]): Promise<DiffStats[]> {
