@@ -115,6 +115,24 @@ export function computeStickyLines(
   startIndex: number,
   endIndex: number,
 ): StickyContextLine[] {
+  // Find the first non-blank visible line *after* the hidden region. Its
+  // indent is the boundary that filters our stack. If there isn't one (region
+  // runs to EOF), there's nothing for sticky context to point at — return
+  // none.
+  let boundaryIndent = Number.POSITIVE_INFINITY
+  let hasBoundary = false
+  for (let i = endIndex; i < rows.length; i++) {
+    const row = rows[i]
+    if (row?.kind !== "paired") continue
+    const line = row.left ?? row.right
+    if (!line) continue
+    if (line.content.trim() === "") continue
+    boundaryIndent = measureIndent(line.content)
+    hasBoundary = true
+    break
+  }
+  if (!hasBoundary) return []
+
   const stack: { indent: number; content: string; lineNo: number; offset: number }[] = []
 
   for (let i = startIndex; i < endIndex; i++) {
@@ -137,22 +155,6 @@ export function computeStickyLines(
       lineNo: line.lineNo,
       offset: i - startIndex,
     })
-  }
-
-  // Drop stack entries whose scope isn't still open at the boundary. We compare
-  // against the indent of the first non-blank visible row after the hidden
-  // region: an entry at indent >= that boundary indent has already closed (or
-  // is itself the boundary line), so it's not an enclosing scope. If there's
-  // no visible row after (region runs to EOF), every entry is an opener.
-  let boundaryIndent = Number.POSITIVE_INFINITY
-  for (let i = endIndex; i < rows.length; i++) {
-    const row = rows[i]
-    if (row?.kind !== "paired") continue
-    const line = row.left ?? row.right
-    if (!line) continue
-    if (line.content.trim() === "") continue
-    boundaryIndent = measureIndent(line.content)
-    break
   }
 
   return stack
@@ -252,6 +254,7 @@ export function collapseRows(
 
   const result: SideBySideRow[] = []
   let cursor = 0
+  const threshold = CONTEXT_LINES * 2 + 1
 
   for (let regionIndex = 0; regionIndex < runs.length; regionIndex++) {
     const run = runs[regionIndex]
@@ -264,6 +267,13 @@ export function collapseRows(
     pushSlice(result, rows, cursor, run.start)
     cursor = run.start
 
+    if (run.length <= threshold) {
+      // Short run — emit all, no collapsing
+      pushSlice(result, rows, cursor, runEnd)
+      cursor = runEnd
+      continue
+    }
+
     const expansion = expansions.get(regionIndex)
     const revealedTop = expansion?.top ?? 0
     const revealedBottom = expansion?.bottom ?? 0
@@ -271,19 +281,6 @@ export function collapseRows(
     // Base visible lines at each boundary
     const baseTop = isAtStart ? 0 : CONTEXT_LINES
     const baseBottom = isAtEnd ? 0 : computeSmartBottom(rows, run.start, runEnd, CONTEXT_LINES)
-
-    // Skip the collapse machinery when collapsing wouldn't save a row anyway:
-    // showing baseTop + collapse-marker + baseBottom takes the same height as
-    // the run itself once `length ≤ baseTop + baseBottom + 1`. For runs in the
-    // middle (baseTop=baseBottom=3) this is the classic 7-line threshold; for
-    // runs at file edges (one side = 0) it's smaller, so a 5-line tail at EOF
-    // still collapses its trailing portion instead of leaking the file's
-    // actual last lines into the view.
-    if (run.length <= baseTop + baseBottom + 1) {
-      pushSlice(result, rows, cursor, runEnd)
-      cursor = runEnd
-      continue
-    }
 
     const showTop = baseTop + revealedTop
     const showBottom = baseBottom + revealedBottom

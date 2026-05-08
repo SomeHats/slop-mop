@@ -60,9 +60,10 @@ describe("computeStickyLines", () => {
     expect(sticky).toEqual([{ content: "describe('outer', () => {", lineNo: 1, offsetFromTop: 0 }])
   })
 
-  test("keeps every opener when hidden region runs to EOF", () => {
-    // Hidden region with no visible rows after it: nothing constrains the
-    // boundary, so every opener stays sticky.
+  test("returns nothing when hidden region runs to EOF", () => {
+    // Sticky context is meant to anchor what's *below* the collapse — when
+    // there's no visible row after the hidden region there's nothing for it
+    // to be context for, so we suppress it entirely.
     const rows: SideBySideRow[] = [
       ctx("describe('outer', () => {", 1),
       ctx("    test('inner', () => {", 2),
@@ -70,10 +71,7 @@ describe("computeStickyLines", () => {
 
     const sticky = computeStickyLines(rows, 0, 2)
 
-    expect(sticky).toEqual([
-      { content: "describe('outer', () => {", lineNo: 1, offsetFromTop: 0 },
-      { content: "    test('inner', () => {", lineNo: 2, offsetFromTop: 1 },
-    ])
+    expect(sticky).toEqual([])
   })
 
   test("pops closed scopes inside the hidden region", () => {
