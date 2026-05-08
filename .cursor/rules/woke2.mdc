@@ -1,0 +1,12 @@
+---
+description: woke2 behavior specs & backlog — when implementing, modifying, or reviewing features
+globs:
+alwaysApply: true
+---
+
+When doing feature work or behavior changes, follow the woke2 skill at `.claude/skills/woke2/SKILL.md`.
+
+Before writing code: define or update behaviors in `*.spec.md` files.
+After writing code: add `// woke2 impl` / `// woke2 test` pragmas, then run `npm run woke2:check`.
+
+Backlog tasks live in `backlog/` — one file per task, named `P<priority>_<Description>.md`. Delete the file when the task is finished.

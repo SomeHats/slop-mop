@@ -1,0 +1,30 @@
+{
+  "name": "woke2-lsp",
+  "displayName": "woke2",
+  "version": "0.1.0",
+  "description": "Language support for woke2 behavior specs — hover, go-to-definition, find-references, diagnostics, and completions for behavior IDs.",
+  "categories": [
+    "Programming Languages"
+  ],
+  "license": "MIT",
+  "publisher": "woke2",
+  "main": "./src/extension.js",
+  "scripts": {
+    "prepare": "node prepare.js",
+    "test": "node --test src/parsing.test.js src/paths.test.js"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "engines": {
+    "vscode": "^1.80.0"
+  }
+}
