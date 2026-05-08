@@ -14,8 +14,13 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 use tiny_http::{Method, Response, Server};
 
+use crate::db::Db;
 use crate::error::Error;
-use crate::git::{commit_with_session_trailer, get_head_commit_hash, stage_all_and_check_dirty};
+use crate::git::{
+    SUBJECT_TRAILER_KEY, commit_with_session_trailer, derive_branch_prefix,
+    get_head_branch_name, get_head_commit_hash, stage_all_and_check_dirty,
+};
+use crate::project::read_project_settings;
 
 /// The user's login shell, falling back to zsh.
 fn user_shell() -> String {
@@ -455,7 +460,7 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
 
     let url = req.url().to_string();
     let path = url.split('?').next().unwrap_or("").to_string();
-    let (_project_id, agent_id) = parse_query(&url);
+    let (project_id, agent_id) = parse_query(&url);
 
     let mut body = String::new();
     if let Err(e) = req.as_reader().read_to_string(&mut body) {
@@ -475,9 +480,9 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
     };
 
     match path.as_str() {
-        "/prompt" => handle_prompt(app, window_label, &agent_id, &parsed),
+        "/prompt" => handle_prompt(app, window_label, &project_id, &agent_id, &parsed),
         "/session-start" => handle_session_start(app, window_label, &agent_id, &parsed),
-        "/stop" => handle_stop(app, window_label, &agent_id, &parsed),
+        "/stop" => handle_stop(app, window_label, &project_id, &agent_id, &parsed),
         other => eprintln!("[hook] unknown path: {other}"),
     }
 
@@ -487,7 +492,13 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
 
 /// UserPromptSubmit: stash the prompt for the upcoming Stop, and commit any
 /// pre-existing uncommitted work as a "check point" so Claude's diff is clean.
-fn handle_prompt(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &serde_json::Value) {
+fn handle_prompt(
+    app: &AppHandle,
+    window_label: &str,
+    project_id: &str,
+    agent_id: &str,
+    parsed: &serde_json::Value,
+) {
     // Mark the agent busy as soon as the prompt is in. Paired with the
     // agent-idle emit at the tail of handle_stop. Frontend uses this to gate
     // the "submit comments" button so we don't interleave inputs.
@@ -546,6 +557,7 @@ fn handle_prompt(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &s
         Ok(true) => commit_staged_and_emit(
             app,
             window_label,
+            project_id,
             agent_id,
             path,
             &session_id,
@@ -568,6 +580,7 @@ fn handle_prompt(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &s
 fn commit_staged_and_emit(
     app: &AppHandle,
     window_label: &str,
+    project_id: &str,
     agent_id: &str,
     path: &Path,
     session_id: &str,
@@ -589,18 +602,37 @@ fn commit_staged_and_emit(
             fallback_subject.to_string()
         }
     };
+
+    // The clean subject for sidebar display; the prefixed form (if any) for
+    // the commit's actual first line, where `git log` and external tools see it.
+    let unprefixed_subject = first_line(&generated);
+    let prefix = resolve_prefix(app, project_id, path);
+    let display_subject = match &prefix {
+        Some(p) => format!("{p}: {unprefixed_subject}"),
+        None => unprefixed_subject.clone(),
+    };
+
     // Trailing blank line is load-bearing: without it, a single-line
     // `Prompt: …` sits in the same paragraph as the appended
     // `Slop-Mop-Session-Id` trailer, and git's interpret-trailers treats
     // `Prompt:` as a trailer too. The blank line forces the appended trailer
     // into its own block.
     let full_message = match body_prompt {
-        Some(prompt) => format!("{generated}\n\nPrompt: {prompt}\n\n"),
-        None => format!("{generated}\n\n"),
+        Some(prompt) => format!("{display_subject}\n\nPrompt: {prompt}\n\n"),
+        None => format!("{display_subject}\n\n"),
     };
-    let subject = first_line(&generated);
 
-    let commit_result = commit_with_session_trailer(path, session_id, &full_message);
+    // When prefixing, also write the un-prefixed subject as a trailer so the
+    // sidebar can display it cleanly without re-deriving the prefix at
+    // display time. Skip when no prefix applies — keeps clean commits clean.
+    let extras: Vec<(&str, &str)> = if prefix.is_some() {
+        vec![(SUBJECT_TRAILER_KEY, unprefixed_subject.as_str())]
+    } else {
+        vec![]
+    };
+
+    let commit_result =
+        commit_with_session_trailer(path, session_id, &full_message, &extras);
     emit_to_window(app, window_label, "commit-finished", status_payload);
     if let Err(e) = commit_result {
         eprintln!("[hook] commit failed: {e}");
@@ -627,18 +659,34 @@ fn commit_staged_and_emit(
             agent_id: agent_id.to_string(),
             session_id: session_id.to_string(),
             commit_hash,
-            prompt: subject,
+            // Always the un-prefixed subject — sidebar shows this directly.
+            prompt: unprefixed_subject,
             timestamp_unix,
         },
     );
     eprintln!("[hook] commit emitted");
 }
 
+/// Resolve the branch prefix to apply for a given commit, if any. Returns
+/// `None` when settings can't be read, mode is `None`, or HEAD is detached.
+fn resolve_prefix(app: &AppHandle, project_id: &str, path: &Path) -> Option<String> {
+    let db = app.try_state::<Db>()?;
+    let settings = read_project_settings(&db, project_id).ok()?;
+    let branch = get_head_branch_name(path)?;
+    derive_branch_prefix(&branch, settings.branch_prefix_mode)
+}
+
 /// Stop: commit Claude's changes (if any) with the prompt as the message.
 /// Wraps `handle_stop_inner` so the agent-idle emit fires no matter which
 /// early-return branch the inner function takes.
-fn handle_stop(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &serde_json::Value) {
-    handle_stop_inner(app, window_label, agent_id, parsed);
+fn handle_stop(
+    app: &AppHandle,
+    window_label: &str,
+    project_id: &str,
+    agent_id: &str,
+    parsed: &serde_json::Value,
+) {
+    handle_stop_inner(app, window_label, project_id, agent_id, parsed);
     emit_to_window(
         app,
         window_label,
@@ -652,6 +700,7 @@ fn handle_stop(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &ser
 fn handle_stop_inner(
     app: &AppHandle,
     window_label: &str,
+    project_id: &str,
     agent_id: &str,
     parsed: &serde_json::Value,
 ) {
@@ -694,6 +743,7 @@ fn handle_stop_inner(
     commit_staged_and_emit(
         app,
         window_label,
+        project_id,
         agent_id,
         path,
         &session_id,

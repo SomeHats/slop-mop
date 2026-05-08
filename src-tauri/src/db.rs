@@ -54,6 +54,19 @@ impl Db {
             CREATE INDEX IF NOT EXISTS idx_comments_session ON comments(session_id);",
         )
         .map_err(|e| Error::Database(e.to_string()))?;
+
+        // Per-project settings live in a JSON blob — adding new options
+        // doesn't need a schema migration. Fresh installs get the column
+        // via this ALTER on the just-created table; subsequent boots see
+        // the duplicate-column error and ignore it.
+        match conn.execute(
+            "ALTER TABLE projects ADD COLUMN settings_json TEXT NOT NULL DEFAULT '{}'",
+            [],
+        ) {
+            Ok(_) => {}
+            Err(e) if e.to_string().contains("duplicate column") => {}
+            Err(e) => return Err(Error::Database(e.to_string())),
+        }
         Ok(())
     }
 }

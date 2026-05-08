@@ -6,6 +6,7 @@ import type {
   FileDiff,
   Project,
   ProjectedComment,
+  ProjectSettings,
   SessionCommit,
 } from "./types"
 
@@ -23,6 +24,18 @@ export function listRecentProjects(): Promise<Project[]> {
 
 export function removeProject(id: string): Promise<void> {
   return invoke("remove_project", { id })
+}
+
+export function getProjectSettings(projectId: string): Promise<ProjectSettings> {
+  return invoke<ProjectSettings>("get_project_settings", { projectId })
+}
+
+export function updateProjectSettings(projectId: string, settings: ProjectSettings): Promise<void> {
+  return invoke("update_project_settings", { projectId, settings })
+}
+
+export function getHeadBranch(projectPath: string): Promise<string | null> {
+  return invoke<string | null>("get_head_branch", { projectPath })
 }
 
 export type SpawnClaudeResult = {

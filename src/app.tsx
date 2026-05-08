@@ -8,6 +8,7 @@ import { useSessionComments } from "./features/comments/use-session-comments"
 import { DiffPanel, type DiffPanelHandle } from "./features/diff/diff-panel"
 import type { ResolvedAnchor } from "./features/diff/side-by-side-diff"
 import { ProjectPicker } from "./features/projects/project-picker"
+import { ProjectSettingsButton } from "./features/projects/project-settings-button"
 import { TerminalPanel } from "./features/terminal/terminal-panel"
 import { useClaudeSession } from "./hooks/use-claude-session"
 import { useDiffStats } from "./hooks/use-diff-stats"
@@ -181,6 +182,9 @@ function ProjectApp({
         <h1 className="text-sm font-bold tracking-tight" title={projectPath}>
           {name}
         </h1>
+        <div className="ml-auto" data-tauri-no-drag-region="">
+          <ProjectSettingsButton projectId={projectId} projectPath={projectPath} />
+        </div>
       </div>
       <Separator />
 

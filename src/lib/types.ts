@@ -5,6 +5,12 @@ export type Project = {
   opened_at: string
 }
 
+export type BranchPrefixMode = "none" | "full" | "feature"
+
+export type ProjectSettings = {
+  branchPrefixMode?: BranchPrefixMode
+}
+
 declare global {
   interface Window {
     __PROJECT?: Project

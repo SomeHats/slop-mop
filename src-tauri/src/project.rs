@@ -5,6 +5,7 @@ use tauri::State;
 
 use crate::db::Db;
 use crate::error::Error;
+use crate::git::{BranchPrefixMode, get_head_branch_name};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
@@ -12,6 +13,12 @@ pub struct Project {
     pub name: String,
     pub path: String,
     pub opened_at: String,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ProjectSettings {
+    pub branch_prefix_mode: BranchPrefixMode,
 }
 
 /// Resolve a path to the working directory of its git repository — main repo
@@ -116,4 +123,51 @@ pub fn remove_project(db: State<'_, Db>, id: String) -> Result<(), Error> {
         .map_err(|e| Error::Database(e.to_string()))?;
 
     Ok(())
+}
+
+/// Read the per-project settings JSON blob, deserializing into `ProjectSettings`.
+/// Returns the default settings if the row is missing or the JSON is malformed —
+/// settings are non-essential and we never want a parse error to break commits.
+pub fn read_project_settings(db: &Db, project_id: &str) -> Result<ProjectSettings, Error> {
+    let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
+    let json: Option<String> = conn
+        .query_row(
+            "SELECT settings_json FROM projects WHERE id = ?1",
+            rusqlite::params![project_id],
+            |row| row.get(0),
+        )
+        .ok();
+    Ok(json
+        .and_then(|s| serde_json::from_str::<ProjectSettings>(&s).ok())
+        .unwrap_or_default())
+}
+
+#[tauri::command]
+pub fn get_project_settings(
+    db: State<'_, Db>,
+    project_id: String,
+) -> Result<ProjectSettings, Error> {
+    read_project_settings(&db, &project_id)
+}
+
+#[tauri::command]
+pub fn update_project_settings(
+    db: State<'_, Db>,
+    project_id: String,
+    settings: ProjectSettings,
+) -> Result<(), Error> {
+    let json = serde_json::to_string(&settings)
+        .map_err(|e| Error::Database(format!("serialize settings: {e}")))?;
+    let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
+    conn.execute(
+        "UPDATE projects SET settings_json = ?1 WHERE id = ?2",
+        rusqlite::params![json, project_id],
+    )
+    .map_err(|e| Error::Database(e.to_string()))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_head_branch(project_path: String) -> Option<String> {
+    get_head_branch_name(Path::new(&project_path))
 }
