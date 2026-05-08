@@ -945,6 +945,20 @@ mod tests {
         assert_eq!(project_range(&change, 5, Some(6)), loc(8, Some(9)));
     }
 
+    // woke2 test CMT-PJ11
+    #[test]
+    fn apply_offset_clamps_negative_and_zero_to_one() {
+        // Defensive guard: well-formed hunks can't drag a line below 1, but
+        // ill-formed input or future code paths might. Clamp protects callers.
+        assert_eq!(apply_offset(5, -10), 1);
+        assert_eq!(apply_offset(1, -1), 1);
+        assert_eq!(apply_offset(1, 0), 1);
+        // Sanity: non-clamping cases pass through.
+        assert_eq!(apply_offset(5, 0), 5);
+        assert_eq!(apply_offset(5, 3), 8);
+        assert_eq!(apply_offset(5, -3), 2);
+    }
+
     // ─── Git-backed integration tests ─────────────────────────────────────
 
     fn make_commit(repo: &Repository, message: &str) -> git2::Oid {
@@ -1272,6 +1286,74 @@ mod tests {
             }
             AnchorForWorkdir::Uncommittable => panic!("expected Anchored"),
         }
+    }
+
+    // woke2 test CMT-AW3
+    #[test]
+    fn integration_anchor_workdir_deleted_file_is_uncommittable() {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("a.txt"), ten_lines()).unwrap();
+        let _c1 = make_commit(&repo, "c1");
+
+        // Delete the file in workdir — `collect_workdir_file` treats this as
+        // EntirelyAdded, so any comment on the file is Uncommittable.
+        fs::remove_file(dir.path().join("a.txt")).unwrap();
+
+        let r = anchor_for_workdir(
+            dir.path().to_string_lossy().into_owned(),
+            "a.txt".into(),
+            3,
+            None,
+        )
+        .unwrap();
+        assert_eq!(r, AnchorForWorkdir::Uncommittable);
+    }
+
+    // woke2 test CMT-AW9
+    #[test]
+    fn anchor_workdir_rejects_zero_start() {
+        let dir = TempDir::new().unwrap();
+        let _ = Repository::init(dir.path()).unwrap();
+        let err = anchor_for_workdir(
+            dir.path().to_string_lossy().into_owned(),
+            "a.txt".into(),
+            0,
+            None,
+        );
+        assert!(matches!(err, Err(Error::InvalidPath(_))));
+    }
+
+    // woke2 test CMT-AW9
+    #[test]
+    fn anchor_workdir_rejects_end_less_than_start() {
+        let dir = TempDir::new().unwrap();
+        let _ = Repository::init(dir.path()).unwrap();
+        let err = anchor_for_workdir(
+            dir.path().to_string_lossy().into_owned(),
+            "a.txt".into(),
+            5,
+            Some(3),
+        );
+        assert!(matches!(err, Err(Error::InvalidPath(_))));
+    }
+
+    // woke2 test CMT-AW9
+    #[test]
+    fn anchor_workdir_accepts_end_equal_to_start() {
+        // Equal endpoints aren't great UX (a one-line range expressed with both
+        // ends) but the validator only rejects end < start; equal must pass.
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("a.txt"), ten_lines()).unwrap();
+        let _c1 = make_commit(&repo, "c1");
+        let r = anchor_for_workdir(
+            dir.path().to_string_lossy().into_owned(),
+            "a.txt".into(),
+            5,
+            Some(5),
+        );
+        assert!(r.is_ok());
     }
 
     // woke2 test CMT-AW2

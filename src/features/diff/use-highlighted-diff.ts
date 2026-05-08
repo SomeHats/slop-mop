@@ -7,6 +7,7 @@ import {
   computeRows,
   type LineData,
   type RegionExpansion,
+  type SideBySideRow,
   type StickyContextLine,
 } from "./compute-diff-rows"
 
@@ -27,6 +28,26 @@ export type HighlightedRow =
       stickyLines: HighlightedStickyLine[]
     }
 
+/**
+ * Reconstruct the old- and new-side full-file line lists from the unfiltered
+ * row list. Highlighter input must include hidden context lines so token
+ * resolution doesn't break inside collapsed regions.
+ */
+// woke2 impl DV-HL1
+export function reconstructOldNewLines(rows: SideBySideRow[]): {
+  oldLines: { lineNo: number; content: string }[]
+  newLines: { lineNo: number; content: string }[]
+} {
+  const oldLines: { lineNo: number; content: string }[] = []
+  const newLines: { lineNo: number; content: string }[] = []
+  for (const row of rows) {
+    if (row.kind !== "paired") continue
+    if (row.left) oldLines.push({ lineNo: row.left.lineNo, content: row.left.content })
+    if (row.right) newLines.push({ lineNo: row.right.lineNo, content: row.right.content })
+  }
+  return { oldLines, newLines }
+}
+
 // woke2 impl DV-HL1, DV-HL2, DV-HL3, DV-HL4
 export function useHighlightedDiff(
   fileDiff: FileDiff,
@@ -35,19 +56,10 @@ export function useHighlightedDiff(
   const allRows = useMemo(() => computeRows(fileDiff.hunks), [fileDiff.hunks])
   const visibleRows = useMemo(() => collapseRows(allRows, expansions), [allRows, expansions])
 
-  // Reconstruct old and new full text from all rows (not just visible)
-  const { oldLines, newLines } = useMemo(() => {
-    const old: { lineNo: number; content: string }[] = []
-    const _new: { lineNo: number; content: string }[] = []
-
-    for (const row of allRows) {
-      if (row.kind !== "paired") continue
-      if (row.left) old.push({ lineNo: row.left.lineNo, content: row.left.content })
-      if (row.right) _new.push({ lineNo: row.right.lineNo, content: row.right.content })
-    }
-
-    return { oldLines: old, newLines: _new }
-  }, [allRows])
+  // Reconstruct old and new full text from all rows (not just visible) so the
+  // highlighter sees full surrounding context — collapsed regions still
+  // contribute lines to the input.
+  const { oldLines, newLines } = useMemo(() => reconstructOldNewLines(allRows), [allRows])
 
   const lang = useMemo(() => langFromPath(fileDiff.path), [fileDiff.path])
 

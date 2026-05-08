@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { computeStickyLines, type SideBySideRow } from "./compute-diff-rows"
+import { computeSmartBottom, computeStickyLines, type SideBySideRow } from "./compute-diff-rows"
 
 function ctx(content: string, lineNo: number): SideBySideRow {
   return {
@@ -156,5 +156,52 @@ describe("computeStickyLines", () => {
   test("returns empty for empty hidden region", () => {
     const rows: SideBySideRow[] = [add("body;", 1)]
     expect(computeStickyLines(rows, 0, 0)).toEqual([])
+  })
+})
+
+// woke2 test DV-SB1
+describe("computeSmartBottom", () => {
+  test("returns maxLines when no indent boundary in candidate window", () => {
+    // All lines at the same indent level — no decreases — so smart-bottom
+    // can't trim anything and falls back to the full maxLines.
+    const rows: SideBySideRow[] = [
+      ctx("    a", 1),
+      ctx("    b", 2),
+      ctx("    c", 3),
+      ctx("    d", 4),
+      ctx("    e", 5),
+      ctx("    f", 6),
+    ]
+    expect(computeSmartBottom(rows, 0, 6, 3)).toBe(3)
+  })
+
+  test("returns maxLines for monotonically increasing indent", () => {
+    // Indent only ever increases, so there's no closing-brace-style boundary
+    // for the heuristic to latch onto — fallback to maxLines.
+    const rows: SideBySideRow[] = [
+      ctx("a", 1),
+      ctx("  a", 2),
+      ctx("    a", 3),
+      ctx("      a", 4),
+      ctx("        a", 5),
+    ]
+    expect(computeSmartBottom(rows, 0, 5, 3)).toBe(3)
+  })
+
+  test("trims when an indent decrease appears in the candidate window", () => {
+    // Indent decreases on the last line — smart-bottom keeps only what's
+    // after the boundary (1 visible line).
+    const rows: SideBySideRow[] = [
+      ctx("    a", 1),
+      ctx("    b", 2),
+      ctx("    c", 3),
+      ctx("    d", 4),
+      ctx("    e", 5),
+      ctx("}", 6),
+    ]
+    // With maxLines=3 the candidate is rows[3..6]; the dedent at row 6 is the
+    // boundary, so visible = runEnd - boundaryIdx - 1 = 6 - 5 - 1 = 0 → clamped
+    // to 1.
+    expect(computeSmartBottom(rows, 0, 6, 3)).toBe(1)
   })
 })

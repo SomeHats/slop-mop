@@ -171,7 +171,7 @@ export function computeStickyLines(
  * the last such boundary so that unrelated scope lines stay hidden.
  */
 // woke2 impl DV-SB1, DV-SB2
-function computeSmartBottom(
+export function computeSmartBottom(
   rows: SideBySideRow[],
   runStart: number,
   runEnd: number,
