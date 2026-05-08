@@ -16,6 +16,7 @@ The frontend for the [project picker](project.spec.md). The picker window appear
 - !PFE-PK5 Recent list is capped to the first 3 entries returned (the backend already orders by recency)
 - !PFE-PK6 Each recent row's row-click opens that project; X icon (visible on hover) calls `removeProject` and refreshes the list
 - !PFE-PK7 Title bar carries the `data-tauri-drag-region` so the macOS-style chromeless window stays draggable
+- !PFE-PK8 Recent rows are `flex-nowrap` with `min-w-0` content so long names and paths truncate with an ellipsis (and surface the full string via `title`) instead of wrapping or pushing the X button onto a new line
 
 ## Project settings popover
 

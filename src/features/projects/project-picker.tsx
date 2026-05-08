@@ -97,13 +97,23 @@ export function ProjectPicker(): React.JSX.Element {
               </h2>
               <ItemGroup>
                 {recentProjects.slice(0, 3).map((project) => (
-                  <Item key={project.id} asChild size="sm" className="cursor-pointer">
+                  <Item
+                    key={project.id}
+                    asChild
+                    size="sm"
+                    // woke2 impl PFE-PK8
+                    className="flex-nowrap cursor-pointer"
+                  >
                     <button type="button" onClick={() => void handleSelectRecent(project)}>
-                      <ItemContent>
-                        <ItemTitle>{project.name}</ItemTitle>
-                        <ItemDescription>{project.path}</ItemDescription>
+                      <ItemContent className="min-w-0">
+                        <ItemTitle className="block truncate" title={project.name}>
+                          {project.name}
+                        </ItemTitle>
+                        <ItemDescription className="truncate" title={project.path}>
+                          {project.path}
+                        </ItemDescription>
                       </ItemContent>
-                      <ItemActions>
+                      <ItemActions className="shrink-0">
                         <Button
                           variant="ghost"
                           size="icon-xs"

@@ -344,6 +344,7 @@ Project picker / settings UI:
 - !PFE-PK5 — top-3 cap
 - !PFE-PK6 — recent-row click + remove
 - !PFE-PK7 — drag region
+- !PFE-PK8 — recent rows truncate + keep X inline: DOM rendering
 - !PFE-ST1 — branch refetch on popover open
 - !PFE-ST2 — three radio options
 - !PFE-ST3 — dim when branch unknown
