@@ -607,15 +607,15 @@ fn commit_staged_and_emit(
         }
     };
 
-    // Strip whatever prefix-like thing claude may have produced (`feat: …`,
-    // `alex/foo: …`, etc.) before applying our own — otherwise we'd end up
-    // double-prefixed like `alex/foo: feat: …`. Done unconditionally: even
-    // when our mode is `none`, we don't want claude sneakily picking a
-    // prefix for us.
-    let unprefixed_subject = strip_subject_prefix(&first_line(&generated)).to_string();
+    // When we're applying our own prefix, strip any claude-generated prefix
+    // first (`feat: …`, `alex/foo: …`, etc.) so we don't end up
+    // double-prefixed like `alex/foo: feat: …`. When mode is `none` we
+    // leave whatever claude wrote untouched — opting out of prefixing
+    // means opting out entirely.
+    let raw_subject = first_line(&generated);
     let display_subject = match resolve_prefix(app, project_id, path) {
-        Some(p) => format!("{p}: {unprefixed_subject}"),
-        None => unprefixed_subject.clone(),
+        Some(p) => format!("{p}: {}", strip_subject_prefix(&raw_subject)),
+        None => raw_subject,
     };
 
     // Trailing blank line is load-bearing: without it, a single-line

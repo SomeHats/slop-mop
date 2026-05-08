@@ -40,6 +40,9 @@ export type ClaudeSession = {
   restart: (opts: { resume: boolean }) => void
   /** Subscribe to commits as they land via the Stop hook (not the initial seed). */
   onCommitLanded: (listener: (commit: SessionCommit) => void) => () => void
+  /** Re-run `listSessionCommits` to pick up a fresh `current_prefix` after
+   *  settings change. No-op when no session is active. */
+  refetchCommits: () => void
 }
 
 function decodeBase64(data: string): Uint8Array {
@@ -73,8 +76,13 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
   const [error, setError] = useState<string | null>(null)
 
   const agentIdRef = useRef<string | null>(null)
+  const sessionIdRef = useRef<string | null>(null)
   const outputListenersRef = useRef<Set<(b: Uint8Array) => void>>(new Set())
   const commitListenersRef = useRef<Set<(c: SessionCommit) => void>>(new Set())
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId
+  }, [sessionId])
 
   useEffect(() => {
     let cancelled = false
@@ -206,6 +214,20 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     }
   }, [])
 
+  const refetchCommits = useCallback((): void => {
+    const sid = sessionIdRef.current
+    const aid = agentIdRef.current
+    if (!sid || !aid) return
+    void listSessionCommits(_projectId, projectPath, sid).then(
+      (loaded) => {
+        if (agentIdRef.current !== aid) return
+        setCommits(loaded.commits)
+        setCurrentPrefix(loaded.current_prefix)
+      },
+      (e) => console.error("[slop-mop] listSessionCommits refetch failed", e),
+    )
+  }, [_projectId, projectPath])
+
   const writeInput = useCallback((bytes: Uint8Array): void => {
     const id = agentIdRef.current
     if (!id) return
@@ -247,5 +269,6 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     resize,
     restart,
     onCommitLanded,
+    refetchCommits,
   }
 }

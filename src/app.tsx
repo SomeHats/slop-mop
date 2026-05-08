@@ -9,6 +9,7 @@ import { DiffPanel, type DiffPanelHandle } from "./features/diff/diff-panel"
 import type { ResolvedAnchor } from "./features/diff/side-by-side-diff"
 import { ProjectPicker } from "./features/projects/project-picker"
 import { ProjectSettingsButton } from "./features/projects/project-settings-button"
+import { useProjectSettings } from "./features/projects/use-project-settings"
 import { TerminalPanel } from "./features/terminal/terminal-panel"
 import { useClaudeSession } from "./hooks/use-claude-session"
 import { useDiffStats } from "./hooks/use-diff-stats"
@@ -51,10 +52,21 @@ function ProjectApp({
 }: ProjectAppProps): React.JSX.Element {
   const session = useClaudeSession(projectPath, projectId)
   const [selection, setSelection] = useState<Selection | null>(null)
+  const projectSettings = useProjectSettings(projectId)
 
   useEffect(() => {
     void startWatching(projectPath)
   }, [projectPath])
+
+  // Refetch the commit list (and the `current_prefix` it carries) whenever
+  // the user changes the branch-prefix mode. The mode value isn't read in
+  // the effect body — Rust re-reads the latest setting from the DB inside
+  // refetchCommits — but we list it as a dep so the effect fires on change.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mode used as a trigger
+  useEffect(() => {
+    if (session.sessionId === null) return
+    session.refetchCommits()
+  }, [projectSettings.branchPrefixMode, session.sessionId, session.refetchCommits])
 
   // When the Stop hook lands a new commit, jump straight into its diff so the
   // user sees what just changed instead of staring at a now-stale terminal.
@@ -183,7 +195,11 @@ function ProjectApp({
           {name}
         </h1>
         <div className="ml-auto" data-tauri-no-drag-region="">
-          <ProjectSettingsButton projectId={projectId} projectPath={projectPath} />
+          <ProjectSettingsButton
+            projectPath={projectPath}
+            branchPrefixMode={projectSettings.branchPrefixMode}
+            onUpdate={projectSettings.update}
+          />
         </div>
       </div>
       <Separator />

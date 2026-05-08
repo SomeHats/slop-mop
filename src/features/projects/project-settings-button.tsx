@@ -11,17 +11,20 @@ import {
 } from "@/components/ui/popover"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { getHeadBranch } from "@/lib/tauri"
-import type { BranchPrefixMode } from "@/lib/types"
+import type { BranchPrefixMode, ProjectSettings } from "@/lib/types"
 import { cn } from "@/lib/utils"
-import { useProjectSettings } from "./use-project-settings"
 
 type Props = {
-  projectId: string
   projectPath: string
+  branchPrefixMode: BranchPrefixMode
+  onUpdate: (partial: Partial<ProjectSettings>) => void
 }
 
-export function ProjectSettingsButton({ projectId, projectPath }: Props): React.JSX.Element {
-  const { branchPrefixMode, update } = useProjectSettings(projectId)
+export function ProjectSettingsButton({
+  projectPath,
+  branchPrefixMode,
+  onUpdate,
+}: Props): React.JSX.Element {
   const [branch, setBranch] = useState<string | null>(null)
 
   // Refetch the current branch every time the popover opens — branches can
@@ -66,7 +69,7 @@ export function ProjectSettingsButton({ projectId, projectPath }: Props): React.
         </PopoverHeader>
         <RadioGroup
           value={branchPrefixMode}
-          onValueChange={(next) => update({ branchPrefixMode: next as BranchPrefixMode })}
+          onValueChange={(next) => onUpdate({ branchPrefixMode: next as BranchPrefixMode })}
           className="gap-1.5"
         >
           <PrefixOption value="none" current={branchPrefixMode} label="None" sample="subject" />
