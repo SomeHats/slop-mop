@@ -18,6 +18,8 @@ The app stores project metadata and inline comments in a single SQLite file unde
 - !DB-SC1 `projects(id PK, name, path UNIQUE, opened_at, settings_json)` — uniqueness on `path` lets the upsert use `ON CONFLICT(path)`
 - !DB-SC2 `comments` schema enforces the line-range invariants described in [comments](comments.spec.md)
 - !DB-SC3 `idx_comments_session` indexes `comments.session_id` for the listing query
+- !DB-SC4 `session_aliases(claude_session_id PK, primary_session_id)` — many-to-one map from a Claude session id to the slop-mop session it belongs to; populated when the user picks "same task, fresh context" after `/clear` etc.
+- !DB-SC5 `idx_session_aliases_primary` indexes `primary_session_id` for the expansion query that walks all claude ids belonging to a slop-mop session
 
 ## Migration strategy
 

@@ -10,7 +10,7 @@ description: Walking git log to surface the commits belonging to a Claude sessio
 ## Walk
 
 - !SCM-W1 Walks `revwalk().push_head()` from HEAD; topology order, no time-based buffering
-- !SCM-W2 Filters commits by matching the `Slop-Mop-Session-Id` trailer to the requested session id
+- !SCM-W2 Filters commits by matching the `Slop-Mop-Session-Id` trailer against any id in the resolved set (the primary plus any aliased Claude session ids)
 - !SCM-W3 Skips commits whose trailer block fails to parse (`message_trailers_strs` error) rather than aborting the walk
 - !SCM-W4 Each result carries: commit hash, session id, subject (first line, prefix-as-stored), full message, and author timestamp in unix seconds
 
@@ -24,3 +24,11 @@ description: Walking git log to surface the commits belonging to a Claude sessio
 
 - !SCM-P1 `list_session_commits` also returns the prefix that *new* commits would carry (delegates to `project::current_prefix`) so the sidebar can strip it consistently
 - !SCM-P2 Returns `None` when no prefix applies (mode=`none`, detached HEAD, or settings unreadable)
+
+## Session aliasing
+
+A single slop-mop session can correspond to multiple Claude session ids — Claude issues a fresh id on `/clear`, `/compact`, etc., and the user gets to decide whether that's a continuation (alias) or a fresh start.
+
+- !SCM-AL1 `walk_session_commits` accepts a list of Claude session ids and matches the trailer against any of them; the row's `session_id` field surfaces the *primary* id regardless of which alias the trailer carried
+- !SCM-AL2 `expand_session_ids(primary)` returns `[primary, ...aliases]` — the primary itself is always implicitly part of the set, even with no rows in `session_aliases`
+- !SCM-AL3 `add_session_alias(claude_id, primary_id)` upserts an alias row; self-aliases (`claude_id == primary_id`) are no-ops since the primary is implicit

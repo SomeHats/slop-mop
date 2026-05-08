@@ -163,6 +163,8 @@ Commands that need Tauri state (commits.rs, comments.rs, project.rs, watcher.rs,
 - !DB-SC1 — projects schema: structural
 - !DB-SC2 — comments schema: covered by CMT-DB2/DB3 constraint tests
 - !DB-SC3 — index: structural
+- !DB-SC4 — session_aliases schema: structural; aliasing covered by SCM-AL2/AL3 tests
+- !DB-SC5 — session_aliases primary index: structural
 - !DB-MG1 — IF NOT EXISTS idempotence: structural
 - !DB-MG2 — ALTER TABLE swallow duplicate-column: structural, integration
 - !DB-MG3 — legacy table preservation: structural, integration
@@ -350,6 +352,9 @@ Project picker / settings UI:
 - !PFE-PS1 — load saved settings
 - !PFE-PS2 — optimistic update + revert
 - !PFE-PS3 — default mode `none`
+- !SES-DG1 — open binding to `pending !== null`: DOM rendering
+- !SES-DG2 — non-dismissibility: DOM rendering
+- !SES-DG3 — source hint + action handlers: DOM rendering
 
 Frontend session hook (use-claude-session.ts):
 
@@ -371,6 +376,9 @@ Frontend session hook (use-claude-session.ts):
 - !UCS-CL2 — only realtime commits notify
 - !UCS-RF1 — refetchCommits no-op when no session
 - !UCS-RF2 — drop response on agent change
+- !UCS-AL1 — pendingNewSession dispatch on mid-flow id change: needs Tauri event mock
+- !UCS-AL2 — acceptNewSession reseeds: needs Tauri IPC mock
+- !UCS-AL3 — aliasNewSession upserts + refetches: needs Tauri IPC mock
 
 Misc hooks (use-diff-stats, use-range-diff, use-fullscreen, use-scroll-into-view):
 

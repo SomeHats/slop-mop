@@ -1,6 +1,7 @@
 import { listen } from "@tauri-apps/api/event"
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
+  addSessionAlias,
   killClaude,
   listSessionCommits,
   resizeClaude,
@@ -10,6 +11,15 @@ import {
 import type { SessionCommit } from "@/lib/types"
 
 export type SessionStartSource = "startup" | "resume" | "clear" | "compact" | (string & {})
+
+/** Surfaced when Claude reports a new session id while one is already
+ *  active — typically `/clear` or `/compact`. The user picks whether to
+ *  treat it as a fresh slop-mop session or as a continuation of the
+ *  existing one. */
+export type PendingNewSession = {
+  newSessionId: string
+  source: SessionStartSource
+}
 
 export type ClaudeSession = {
   commits: SessionCommit[]
@@ -43,6 +53,16 @@ export type ClaudeSession = {
   /** Re-run `listSessionCommits` to pick up a fresh `current_prefix` after
    *  settings change. No-op when no session is active. */
   refetchCommits: () => void
+  /** Set when Claude issued a new session id mid-flow (e.g. `/clear`). The
+   *  app should surface a dialog and call one of `acceptNewSession` /
+   *  `aliasNewSession`. Null when no decision is pending. */
+  pendingNewSession: PendingNewSession | null
+  /** Treat the pending new claude id as a fresh slop-mop session: clear
+   *  commits, switch primary, re-seed history. */
+  acceptNewSession: () => void
+  /** Keep the existing slop-mop session as the primary and record the
+   *  pending claude id as an alias. Refetches commits afterwards. */
+  aliasNewSession: () => void
 }
 
 function decodeBase64(data: string): Uint8Array {
@@ -75,6 +95,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
   const [isBusy, setIsBusy] = useState(false)
   const [currentPrefix, setCurrentPrefix] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [pendingNewSession, setPendingNewSession] = useState<PendingNewSession | null>(null)
 
   const agentIdRef = useRef<string | null>(null)
   const sessionIdRef = useRef<string | null>(null)
@@ -119,6 +140,20 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
         }>("session-started", (evt) => {
           if (evt.payload.agent_id !== agentIdRef.current) return
           console.log("[slop-mop] session-started", evt.payload)
+          // Mid-flow new session id (e.g. /clear, /compact, /resume from
+          // inside Claude): defer the decision to the user. Don't touch
+          // sessionId / commits yet — the dialog handler will do that.
+          // woke2 impl UCS-AL1
+          if (
+            sessionIdRef.current !== null &&
+            evt.payload.session_id !== sessionIdRef.current
+          ) {
+            setPendingNewSession({
+              newSessionId: evt.payload.session_id,
+              source: evt.payload.source,
+            })
+            return
+          }
           setSessionId(evt.payload.session_id)
           setSessionSource(evt.payload.source)
           // Seed history from git log for this session, and capture the
@@ -251,6 +286,48 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     void resizeClaude(id, cols, rows)
   }, [])
 
+  // woke2 impl UCS-AL2
+  const acceptNewSession = useCallback((): void => {
+    setPendingNewSession((pending) => {
+      if (!pending) return null
+      const aid = agentIdRef.current
+      setSessionId(pending.newSessionId)
+      setSessionSource(pending.source)
+      setCommits([])
+      setCurrentPrefix(null)
+      void listSessionCommits(_projectId, projectPath, pending.newSessionId).then(
+        (loaded) => {
+          if (agentIdRef.current !== aid) return
+          setCommits(loaded.commits)
+          setCurrentPrefix(loaded.current_prefix)
+        },
+        (e) => console.error("[slop-mop] listSessionCommits (accept new) failed", e),
+      )
+      return null
+    })
+  }, [_projectId, projectPath])
+
+  // woke2 impl UCS-AL3
+  const aliasNewSession = useCallback((): void => {
+    setPendingNewSession((pending) => {
+      if (!pending) return null
+      const primary = sessionIdRef.current
+      const aid = agentIdRef.current
+      if (!primary) return null
+      void addSessionAlias(pending.newSessionId, primary)
+        .then(() => listSessionCommits(_projectId, projectPath, primary))
+        .then(
+          (loaded) => {
+            if (agentIdRef.current !== aid) return
+            setCommits(loaded.commits)
+            setCurrentPrefix(loaded.current_prefix)
+          },
+          (e) => console.error("[slop-mop] aliasNewSession failed", e),
+        )
+      return null
+    })
+  }, [_projectId, projectPath])
+
   // woke2 impl UCS-SP6
   const restart = useCallback((opts: { resume: boolean }): void => {
     setResumeMode(opts.resume)
@@ -262,6 +339,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     setIsBusy(false)
     setCurrentPrefix(null)
     setIsConnecting(true)
+    setPendingNewSession(null)
     setSpawnSeq((s) => s + 1)
   }, [])
 
@@ -282,5 +360,8 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     restart,
     onCommitLanded,
     refetchCommits,
+    pendingNewSession,
+    acceptNewSession,
+    aliasNewSession,
   }
 }

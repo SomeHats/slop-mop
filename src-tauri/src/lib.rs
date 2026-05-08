@@ -56,6 +56,7 @@ pub fn run() {
             claude::resize_claude,
             claude::kill_claude,
             commits::list_session_commits,
+            commits::add_session_alias,
             window::open_project_window,
             diff::batch_diff_stats,
             diff::get_range_diff,

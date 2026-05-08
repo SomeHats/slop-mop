@@ -118,6 +118,10 @@ export function updateComment(id: string, contents: string): Promise<Comment> {
   return invoke<Comment>("update_comment", { id, contents })
 }
 
+export function addSessionAlias(claudeSessionId: string, primarySessionId: string): Promise<void> {
+  return invoke("add_session_alias", { claudeSessionId, primarySessionId })
+}
+
 export function getFileLines(
   projectPath: string,
   filePath: string,

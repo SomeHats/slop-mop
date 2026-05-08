@@ -39,3 +39,11 @@ The hook that subscribes to every backend event from [auto-commit hooks](claude.
 
 - !UCS-RF1 `refetchCommits` re-runs `listSessionCommits` to pick up a fresh `current_prefix` after settings change; no-op when no session is active
 - !UCS-RF2 Drops the response if the agent changed mid-flight
+
+## New-session decision (mid-flow alias-or-new)
+
+When Claude reports a new session id while one is already active (`/clear`, `/compact`, etc.), the hook defers the decision to the user instead of silently switching. See [new-session dialog](new-session-dialog.spec.md) for the UI half.
+
+- !UCS-AL1 If `session-started` fires with `session_id !== sessionIdRef.current` and the current id is non-null, sets `pendingNewSession` to `{ newSessionId, source }` and does *not* touch `sessionId` / `commits`
+- !UCS-AL2 `acceptNewSession()` switches the primary to the pending Claude id, clears commits, and re-seeds via `listSessionCommits`
+- !UCS-AL3 `aliasNewSession()` records the pending id under the current primary via `tauri.addSessionAlias`, then refetches commits using the (unchanged) primary so commits already authored under the new id surface in the sidebar

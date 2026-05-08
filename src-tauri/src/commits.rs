@@ -34,12 +34,16 @@ pub struct SessionCommitsResult {
     pub current_prefix: Option<String>,
 }
 
-/// Walk `git log` from HEAD and pull out commits carrying the given session
-/// trailer. Pure: no DB access, no app state — call directly in tests.
-// woke2 impl SCM-W1, SCM-W2, SCM-W3, SCM-W4, SCM-O1, SCM-O2, SCM-O3
+/// Walk `git log` from HEAD and pull out commits carrying any of the given
+/// session trailers. Pure: no DB access, no app state — call directly in
+/// tests. The "primary" id is the one we surface on each returned row; the
+/// trailer carries whichever claude id the commit was authored under (which
+/// may be an alias).
+// woke2 impl SCM-W1, SCM-W2, SCM-W3, SCM-W4, SCM-O1, SCM-O2, SCM-O3, SCM-AL1
 fn walk_session_commits(
     project_path: &str,
-    session_id: &str,
+    primary_session_id: &str,
+    claude_session_ids: &[String],
 ) -> Result<Vec<SessionCommit>, Error> {
     let repo = Repository::discover(Path::new(project_path))
         .map_err(|_| Error::NotAGitRepo(project_path.to_string()))?;
@@ -60,7 +64,7 @@ fn walk_session_commits(
         };
         let matches = trailers
             .iter()
-            .any(|(k, v)| k == SESSION_TRAILER_KEY && v == session_id);
+            .any(|(k, v)| k == SESSION_TRAILER_KEY && claude_session_ids.iter().any(|s| s == v));
         if !matches {
             continue;
         }
@@ -69,7 +73,7 @@ fn walk_session_commits(
 
         out.push(SessionCommit {
             commit_hash: oid.to_string(),
-            session_id: session_id.to_string(),
+            session_id: primary_session_id.to_string(),
             prompt: subject,
             message: message.to_string(),
             timestamp_unix: commit.time().seconds(),
@@ -77,6 +81,32 @@ fn walk_session_commits(
     }
 
     Ok(out)
+}
+
+/// Return every claude session id known to belong to a given primary
+/// slop-mop session — the primary id itself plus any aliases recorded in the
+/// `session_aliases` table.
+// woke2 impl SCM-AL2
+fn expand_session_ids(db: &Db, primary_session_id: &str) -> Result<Vec<String>, Error> {
+    let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT claude_session_id FROM session_aliases WHERE primary_session_id = ?1",
+        )
+        .map_err(|e| Error::Database(e.to_string()))?;
+    let rows = stmt
+        .query_map(rusqlite::params![primary_session_id], |row| row.get::<_, String>(0))
+        .map_err(|e| Error::Database(e.to_string()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| Error::Database(e.to_string()))?;
+
+    let mut ids = vec![primary_session_id.to_string()];
+    for r in rows {
+        if !ids.contains(&r) {
+            ids.push(r);
+        }
+    }
+    Ok(ids)
 }
 
 // woke2 impl SCM-P1, SCM-P2
@@ -87,12 +117,47 @@ pub fn list_session_commits(
     project_path: String,
     session_id: String,
 ) -> Result<SessionCommitsResult, Error> {
-    let commits = walk_session_commits(&project_path, &session_id)?;
+    let claude_ids = expand_session_ids(&db, &session_id)?;
+    let commits = walk_session_commits(&project_path, &session_id, &claude_ids)?;
     let prefix = current_prefix(&db, &project_id, Path::new(&project_path));
     Ok(SessionCommitsResult {
         commits,
         current_prefix: prefix,
     })
+}
+
+// woke2 impl SCM-AL3
+fn add_session_alias_inner(
+    db: &Db,
+    claude_session_id: &str,
+    primary_session_id: &str,
+) -> Result<(), Error> {
+    if claude_session_id == primary_session_id {
+        // Self-alias is a no-op; the primary id is always implicitly part of
+        // the set returned by `expand_session_ids`.
+        return Ok(());
+    }
+    let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
+    conn.execute(
+        "INSERT OR REPLACE INTO session_aliases (claude_session_id, primary_session_id) \
+         VALUES (?1, ?2)",
+        rusqlite::params![claude_session_id, primary_session_id],
+    )
+    .map_err(|e| Error::Database(e.to_string()))?;
+    Ok(())
+}
+
+/// Mark `claude_session_id` as an alias of `primary_session_id`. Used when the
+/// user picks "continue" after Claude issues a fresh session id mid-flow
+/// (`/clear`, `/compact`, etc.) and the slop-mop session should still group
+/// the commits under one primary.
+#[tauri::command]
+pub fn add_session_alias(
+    db: State<'_, Db>,
+    claude_session_id: String,
+    primary_session_id: String,
+) -> Result<(), Error> {
+    add_session_alias_inner(&db, &claude_session_id, &primary_session_id)
 }
 
 #[cfg(test)]
@@ -144,7 +209,12 @@ mod tests {
             "subject C\n\nbody\n\nSlop-Mop-Session-Id: other\n",
         );
 
-        let out = walk_session_commits(&dir.path().to_string_lossy(), "sess1").unwrap();
+        let out = walk_session_commits(
+            &dir.path().to_string_lossy(),
+            "sess1",
+            &["sess1".to_string()],
+        )
+        .unwrap();
 
         assert_eq!(out.len(), 2);
         // Newest first.
@@ -152,5 +222,76 @@ mod tests {
         assert_eq!(out[0].message, msg_b);
         assert_eq!(out[1].prompt, "subject A");
         assert_eq!(out[1].message, msg_a);
+    }
+
+    // woke2 test SCM-AL1, SCM-AL2
+    #[test]
+    fn walk_session_commits_matches_any_aliased_id() {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+
+        // Three commits: one under the original claude session id, one under an
+        // aliased id (e.g., the user picked "continue" after /clear), and one
+        // under an unrelated session.
+        make_commit(
+            &repo,
+            "a.txt",
+            "a",
+            "subject A\n\nSlop-Mop-Session-Id: original\n",
+        );
+        make_commit(
+            &repo,
+            "b.txt",
+            "b",
+            "subject B\n\nSlop-Mop-Session-Id: after-clear\n",
+        );
+        make_commit(
+            &repo,
+            "c.txt",
+            "c",
+            "subject C\n\nSlop-Mop-Session-Id: unrelated\n",
+        );
+
+        let out = walk_session_commits(
+            &dir.path().to_string_lossy(),
+            "original",
+            &["original".to_string(), "after-clear".to_string()],
+        )
+        .unwrap();
+
+        assert_eq!(out.len(), 2);
+        // Newest first.
+        assert_eq!(out[0].prompt, "subject B");
+        assert_eq!(out[1].prompt, "subject A");
+        // Both rows surface the primary id, regardless of the trailer that
+        // matched.
+        assert_eq!(out[0].session_id, "original");
+        assert_eq!(out[1].session_id, "original");
+    }
+
+    // woke2 test SCM-AL2, SCM-AL3
+    #[test]
+    fn expand_and_alias_round_trip() {
+        let db = Db::open_in_memory().unwrap();
+
+        // No aliases yet → only the primary itself.
+        let ids = expand_session_ids(&db, "primary").unwrap();
+        assert_eq!(ids, vec!["primary".to_string()]);
+
+        add_session_alias_inner(&db, "alias-a", "primary").unwrap();
+        add_session_alias_inner(&db, "alias-b", "primary").unwrap();
+
+        let mut ids = expand_session_ids(&db, "primary").unwrap();
+        ids.sort();
+        assert_eq!(
+            ids,
+            vec!["alias-a".to_string(), "alias-b".to_string(), "primary".to_string()]
+        );
+
+        // Self-alias is a no-op (no row inserted).
+        add_session_alias_inner(&db, "primary", "primary").unwrap();
+        let mut ids = expand_session_ids(&db, "primary").unwrap();
+        ids.sort();
+        assert_eq!(ids.len(), 3);
     }
 }

@@ -10,6 +10,7 @@ import type { ResolvedAnchor } from "./features/diff/side-by-side-diff"
 import { ProjectPicker } from "./features/projects/project-picker"
 import { ProjectSettingsButton } from "./features/projects/project-settings-button"
 import { useProjectSettings } from "./features/projects/use-project-settings"
+import { NewSessionDialog } from "./features/session/new-session-dialog"
 import { TerminalPanel } from "./features/terminal/terminal-panel"
 import { useClaudeSession } from "./hooks/use-claude-session"
 import { useCommentOnlyFileDiffs } from "./hooks/use-comment-only-file-diffs"
@@ -246,6 +247,12 @@ function ProjectApp({
           <Separator />
         </>
       ) : null}
+
+      <NewSessionDialog
+        pending={session.pendingNewSession}
+        onAccept={session.acceptNewSession}
+        onAlias={session.aliasNewSession}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         <ChatSidebar

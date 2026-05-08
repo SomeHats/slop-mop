@@ -33,8 +33,13 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
+  showCloseButton = true,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  /** Default true. Set false to suppress the default `X` affordance — useful
+   *  for dialogs that must be answered (e.g., the new-session-decision flow). */
+  showCloseButton?: boolean
+}) {
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -47,13 +52,15 @@ function DialogContent({
         {...props}
       >
         {children}
-        <DialogPrimitive.Close
-          data-slot="dialog-close"
-          className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
-        >
-          <X className="size-4" />
-          <span className="sr-only">Close</span>
-        </DialogPrimitive.Close>
+        {showCloseButton ? (
+          <DialogPrimitive.Close
+            data-slot="dialog-close"
+            className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
+          >
+            <X className="size-4" />
+            <span className="sr-only">Close</span>
+          </DialogPrimitive.Close>
+        ) : null}
       </DialogPrimitive.Content>
     </DialogPortal>
   )

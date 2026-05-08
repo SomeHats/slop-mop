@@ -29,7 +29,7 @@ impl Db {
         Ok(db)
     }
 
-    // woke2 impl DB-MG1, DB-MG3, DB-SC1, DB-SC2, DB-SC3, CMT-DB1, CMT-DB4
+    // woke2 impl DB-MG1, DB-MG3, DB-SC1, DB-SC2, DB-SC3, DB-SC4, DB-SC5, CMT-DB1, CMT-DB4
     fn migrate(&self) -> Result<(), Error> {
         let conn = self.0.lock().map_err(|e| Error::Database(e.to_string()))?;
         // History is now sourced from git log (see commits.rs); the legacy
@@ -54,7 +54,13 @@ impl Db {
                 CHECK (range_start >= 1),
                 CHECK (range_end IS NULL OR range_end > range_start)
             );
-            CREATE INDEX IF NOT EXISTS idx_comments_session ON comments(session_id);",
+            CREATE INDEX IF NOT EXISTS idx_comments_session ON comments(session_id);
+            CREATE TABLE IF NOT EXISTS session_aliases (
+                claude_session_id TEXT PRIMARY KEY,
+                primary_session_id TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_session_aliases_primary
+                ON session_aliases(primary_session_id);",
         )
         .map_err(|e| Error::Database(e.to_string()))?;
 
