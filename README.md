@@ -16,6 +16,19 @@ Slop Mop is a small wrapper around Claude Code, implementing a specific workflow
 
 For now, this only supports Claude Code. Getting the robot to add support for other agent harnesses is probably pretty doable though. Also fair warning: this thing is _pure slop_. It has not been mopped. It's entirely unreviewed agent produced nonsense and might do something horrible. I've been finding it pretty useful though!
 
+## Install
+
+If you just want to use Slop Mop (not hack on it), clone the repo, then:
+
+```sh
+pnpm install
+pnpm install-mac-app
+```
+
+That builds a macOS bundle and copies `Slop Mop.app` to your `/Applications` folder. Open it like any other app.
+
+Re-run `pnpm install-mac-app` whenever you pull new changes to upgrade. (No auto-update yet — see the warning above.)
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) v22+
