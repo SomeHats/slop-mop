@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { langFromPath } from "./lang"
 
+// woke2 test LIB-LG1, LIB-LG2, LIB-LG3, LIB-LG4
 describe("langFromPath", () => {
   it("maps known extensions to languages", () => {
     expect(langFromPath("foo.ts")).toBe("typescript")

@@ -29,6 +29,7 @@ function withProjection(
   return { comment: c, projection, sessionProjection }
 }
 
+// woke2 test CFE-SM4, CFE-SM5, CFE-SM6
 describe("formatCommentsForSubmit", () => {
   test("empty input → empty string", () => {
     expect(formatCommentsForSubmit([])).toBe("")
@@ -59,6 +60,7 @@ describe("formatCommentsForSubmit", () => {
   })
 })
 
+// woke2 test CFE-SM1, CFE-SM2, CFE-SM3
 describe("commentForSubmit", () => {
   test("returns null when projection is null (still pending)", () => {
     expect(commentForSubmit(withProjection(comment(), null, null))).toBeNull()

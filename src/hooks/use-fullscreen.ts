@@ -1,6 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { useEffect, useState } from "react"
 
+// woke2 impl FS-1, FS-2
 export function useFullscreen(): boolean {
   const [fullscreen, setFullscreen] = useState(false)
 

@@ -19,6 +19,7 @@ impl WatcherManager {
         Self(Mutex::new(HashMap::new()))
     }
 
+    // woke2 impl WCH-S7
     pub fn stop_for_window(&self, label: &str) {
         if let Ok(mut guard) = self.0.lock() {
             guard.remove(label);
@@ -26,6 +27,7 @@ impl WatcherManager {
     }
 }
 
+// woke2 impl WCH-S1, WCH-S2, WCH-S3, WCH-S4, WCH-S5
 #[tauri::command]
 pub fn start_watching(
     window: WebviewWindow,
@@ -80,6 +82,7 @@ pub fn start_watching(
     Ok(())
 }
 
+// woke2 impl WCH-S6
 #[tauri::command]
 pub fn stop_watching(
     window: WebviewWindow,

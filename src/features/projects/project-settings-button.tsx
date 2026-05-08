@@ -29,6 +29,7 @@ export function ProjectSettingsButton({
 
   // Refetch the current branch every time the popover opens — branches can
   // change underneath us (user does `git checkout` in their terminal).
+  // woke2 impl PFE-ST1
   const [open, setOpen] = useState(false)
   useEffect(() => {
     if (!open) return
@@ -46,6 +47,7 @@ export function ProjectSettingsButton({
     }
   }, [open, projectPath])
 
+  // woke2 impl PFE-ST2, PFE-ST3, PFE-ST5, PFE-ST6
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -123,6 +125,7 @@ function PrefixOption({ value, current, label, sample, unavailable }: OptionProp
 
 /** Mirror the backend's `feature` mode: strip everything up to and including
  *  the first `/`. Branches with no `/` return their own name. */
+// woke2 impl PFE-ST4
 function featurePart(branch: string | null): string | null {
   if (branch === null) return null
   const idx = branch.indexOf("/")

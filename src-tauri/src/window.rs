@@ -6,6 +6,7 @@ use crate::project;
 
 /// Create and show the project picker window.
 /// Does nothing if the picker window already exists (brings it to front instead).
+// woke2 impl WIN-PK1, WIN-PK2
 pub fn open_picker_window(app: &AppHandle) -> Result<(), Error> {
     if let Some(w) = app.get_webview_window("picker") {
         let _ = w.set_focus();
@@ -28,6 +29,7 @@ pub fn open_picker_window(app: &AppHandle) -> Result<(), Error> {
 /// Open a project in a new OS window.
 /// Validates the path as a git repo, upserts into the DB, creates a new window
 /// with `window.__PROJECT` injected, and closes the picker if open.
+// woke2 impl WIN-PJ1, WIN-PJ2, WIN-PJ3, WIN-PJ4, WIN-PJ5, WIN-PJ6
 #[tauri::command]
 pub async fn open_project_window(app: AppHandle, path: String) -> Result<(), Error> {
     let db = app.state::<Db>();

@@ -36,6 +36,7 @@ const BEHAVIOR_ID_RE = /^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$/
 
 // ---------- file listing ----------
 
+// woke2 impl W2C-FL1, W2C-FL2
 /** @param {string} root */
 function listFiles(root) {
   try {
@@ -96,6 +97,7 @@ function extractPragmas(content, file) {
 
 const UNTESTABLE_ID_RE = /^\s*[-*]\s+!([A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)\b/
 
+// woke2 impl W2C-UT1, W2C-UT2, W2C-UT3
 /** @param {string} root */
 function loadUntestableIds(root) {
   /** @type {Set<string>} */
@@ -129,6 +131,7 @@ const BACKLOG_DEP_RE = /^\s*[-*]\s+(\S+\.md)\b/
  * @param {string[]} backlogFiles - paths relative to root (e.g. "backlog/P1_Foo.md")
  * @returns {{ deps: Map<string, string[]>, broken: { file: string, target: string }[] }}
  */
+// woke2 impl W2C-BL1, W2C-BL2, W2C-BL3, W2C-BL4, W2C-V7
 function parseBacklogDeps(root, backlogFiles) {
   /** @type {Map<string, string[]>} */
   const deps = new Map()
@@ -182,6 +185,7 @@ function parseBacklogDeps(root, backlogFiles) {
  * @param {Map<string, string[]>} deps
  * @returns {string[] | null} cycle path if found, null otherwise
  */
+// woke2 impl W2C-V6
 function detectCycle(deps) {
   /** @type {Set<string>} */
   const visited = new Set()
@@ -236,6 +240,7 @@ const MARKDOWN_LINK_RE = /\[([^\]]*)\]\(([^)]+\.spec\.md)(?:#[^)]*)?\)/g
  * @param {{ file: string, content: string }[]} specEntries
  * @returns {{ file: string, line: number, target: string }[]}
  */
+// woke2 impl W2C-V5, W2C-LK1, W2C-LK2, W2C-LK3
 function checkSpecLinks(root, specEntries) {
   /** @type {{ file: string, line: number, target: string }[]} */
   const broken = []
@@ -265,6 +270,7 @@ function checkSpecLinks(root, specEntries) {
 
 // ---------- main ----------
 
+// woke2 impl W2C-V1, W2C-V2, W2C-V3, W2C-V4, W2C-V8, W2C-CV1, W2C-CV2, W2C-CV3, W2C-CV4
 function main() {
   const root = process.cwd()
   const allFiles = listFiles(root).filter((f) => existsSync(join(root, f)))

@@ -26,6 +26,7 @@ export type CommentsPanelProps = {
   className?: string
 }
 
+// woke2 impl CFE-PN7
 function reasonText(p: ProjectionResult | null): string {
   if (p === null) return "Checking projection…"
   if (p.kind === "orphaned") {
@@ -47,6 +48,7 @@ export function CommentsPanel({
   onDelete,
   className,
 }: CommentsPanelProps): React.JSX.Element | null {
+  // woke2 impl CFE-PN2
   const { sendableCount, stagedSendableCount } = useMemo(() => {
     let sendable = 0
     let stagedSendable = 0
@@ -58,8 +60,10 @@ export function CommentsPanel({
     return { sendableCount: sendable, stagedSendableCount: stagedSendable }
   }, [comments, staged])
 
+  // woke2 impl CFE-PN1
   if (comments.length === 0) return null
 
+  // woke2 impl CFE-PN3
   const headerChecked: boolean | "indeterminate" =
     sendableCount === 0
       ? false
@@ -69,6 +73,7 @@ export function CommentsPanel({
           ? true
           : "indeterminate"
 
+  // woke2 impl CFE-PN11
   return (
     <div
       className={cn(
@@ -84,6 +89,7 @@ export function CommentsPanel({
         <Checkbox
           checked={headerChecked}
           disabled={sendableCount === 0}
+          // woke2 impl CFE-PN4
           onCheckedChange={(next) => onToggleAllStaged(next === true)}
           aria-label="Stage all comments"
         />
@@ -103,6 +109,7 @@ export function CommentsPanel({
           <Button
             type="button"
             size="sm"
+            // woke2 impl CFE-PN5
             disabled={stagedSendableCount === 0 || isAgentBusy}
             onClick={onSubmit}
             className="h-6 px-2 text-[10px]"
@@ -113,6 +120,7 @@ export function CommentsPanel({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {comments.map(({ comment, projection, sessionProjection }) => {
+          // woke2 impl CFE-PN6, CFE-PN8, CFE-PN9, CFE-PN10
           const orphaned = isOrphaned(projection)
           const sendable = sessionProjection?.kind === "located"
           const checkboxTitle = sendable ? undefined : reasonText(sessionProjection)

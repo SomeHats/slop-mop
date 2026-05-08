@@ -9,6 +9,7 @@ export type UseProjectSettings = {
   update: (partial: Partial<ProjectSettings>) => void
 }
 
+// woke2 impl PFE-PS1, PFE-PS2, PFE-PS3
 export function useProjectSettings(projectId: string): UseProjectSettings {
   const [settings, setSettings] = useState<ProjectSettings>({})
   // Snapshot for optimistic-revert.

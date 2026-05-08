@@ -62,6 +62,7 @@ function encodeBase64(bytes: Uint8Array): string {
   return btoa(binary)
 }
 
+// woke2 impl UCS-SP1, UCS-SP2, UCS-SP3, UCS-SP4, UCS-SP5
 export function useClaudeSession(projectPath: string, _projectId: string): ClaudeSession {
   const [commits, setCommits] = useState<SessionCommit[]>([])
   const [agentId, setAgentId] = useState<string | null>(null)
@@ -99,6 +100,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
         agentIdRef.current = result.agent_id
         setAgentId(result.agent_id)
 
+        // woke2 impl UCS-EV1
         const outputUnlisten = await listen<{ agent_id: string; data: string }>(
           "claude-output",
           (evt) => {
@@ -109,6 +111,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
         )
         unlisteners.push(outputUnlisten)
 
+        // woke2 impl UCS-EV2
         const sessionUnlisten = await listen<{
           agent_id: string
           session_id: string
@@ -133,6 +136,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
         })
         unlisteners.push(sessionUnlisten)
 
+        // woke2 impl UCS-EV3
         const startedUnlisten = await listen<{ agent_id: string }>("commit-started", (evt) => {
           if (evt.payload.agent_id !== agentIdRef.current) return
           setCommittingCount((n) => n + 1)
@@ -145,6 +149,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
         })
         unlisteners.push(finishedUnlisten)
 
+        // woke2 impl UCS-EV4
         const busyUnlisten = await listen<{ agent_id: string }>("agent-busy", (evt) => {
           if (evt.payload.agent_id !== agentIdRef.current) return
           setIsBusy(true)
@@ -157,6 +162,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
         })
         unlisteners.push(idleUnlisten)
 
+        // woke2 impl UCS-EV5, UCS-CL2
         const committedUnlisten = await listen<{
           agent_id: string
           session_id: string
@@ -200,6 +206,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     }
   }, [projectPath, _projectId, spawnSeq, resumeMode])
 
+  // woke2 impl UCS-IO1
   const onOutput = useCallback((listener: (bytes: Uint8Array) => void): (() => void) => {
     outputListenersRef.current.add(listener)
     return () => {
@@ -207,6 +214,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     }
   }, [])
 
+  // woke2 impl UCS-CL1
   const onCommitLanded = useCallback((listener: (commit: SessionCommit) => void): (() => void) => {
     commitListenersRef.current.add(listener)
     return () => {
@@ -214,6 +222,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     }
   }, [])
 
+  // woke2 impl UCS-RF1, UCS-RF2
   const refetchCommits = useCallback((): void => {
     const sid = sessionIdRef.current
     const aid = agentIdRef.current
@@ -228,18 +237,21 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     )
   }, [_projectId, projectPath])
 
+  // woke2 impl UCS-IO2
   const writeInput = useCallback((bytes: Uint8Array): void => {
     const id = agentIdRef.current
     if (!id) return
     void writeClaudeStdin(id, encodeBase64(bytes))
   }, [])
 
+  // woke2 impl UCS-IO3
   const resize = useCallback((cols: number, rows: number): void => {
     const id = agentIdRef.current
     if (!id) return
     void resizeClaude(id, cols, rows)
   }, [])
 
+  // woke2 impl UCS-SP6
   const restart = useCallback((opts: { resume: boolean }): void => {
     setResumeMode(opts.resume)
     setSessionId(null)

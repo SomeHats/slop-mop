@@ -36,6 +36,7 @@ pub struct SessionCommitsResult {
 
 /// Walk `git log` from HEAD and pull out commits carrying the given session
 /// trailer. Pure: no DB access, no app state — call directly in tests.
+// woke2 impl SCM-W1, SCM-W2, SCM-W3, SCM-W4, SCM-O1, SCM-O2, SCM-O3
 fn walk_session_commits(
     project_path: &str,
     session_id: &str,
@@ -78,6 +79,7 @@ fn walk_session_commits(
     Ok(out)
 }
 
+// woke2 impl SCM-P1, SCM-P2
 #[tauri::command]
 pub fn list_session_commits(
     db: State<'_, Db>,
@@ -120,6 +122,7 @@ mod tests {
             .unwrap()
     }
 
+    // woke2 test SCM-W2, SCM-O1, SCM-O2, SCM-O3
     #[test]
     fn list_session_commits_returns_subject_and_full_message() {
         let dir = TempDir::new().unwrap();

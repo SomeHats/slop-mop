@@ -27,6 +27,7 @@ export type HighlightedRow =
       stickyLines: HighlightedStickyLine[]
     }
 
+// woke2 impl DV-HL1, DV-HL2, DV-HL3, DV-HL4
 export function useHighlightedDiff(
   fileDiff: FileDiff,
   expansions: Map<number, RegionExpansion>,

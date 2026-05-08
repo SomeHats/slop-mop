@@ -1,3 +1,4 @@
+// woke2 impl LIB-LG1
 export const EXT_TO_LANGUAGE: Record<string, string> = {
   ts: "typescript",
   tsx: "tsx",
@@ -18,6 +19,7 @@ export const EXT_TO_LANGUAGE: Record<string, string> = {
   go: "go",
 }
 
+// woke2 impl LIB-LG2, LIB-LG3, LIB-LG4
 export function langFromPath(filePath: string): string | undefined {
   const ext = filePath.split(".").pop()?.toLowerCase()
   return ext ? EXT_TO_LANGUAGE[ext] : undefined

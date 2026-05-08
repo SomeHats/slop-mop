@@ -10,6 +10,7 @@ import type {
   SessionCommitsResult,
 } from "./types"
 
+// woke2 impl LIB-TA1, LIB-TA2
 export function openProject(path: string): Promise<Project> {
   return invoke<Project>("open_project", { path })
 }

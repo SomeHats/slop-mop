@@ -23,6 +23,7 @@ export type RegionExpansion = {
 }
 
 const CONTEXT_LINES = 3
+// woke2 impl DV-CL8
 export const EXPAND_STEP = 20
 
 /**
@@ -30,6 +31,7 @@ export const EXPAND_STEP = 20
  * Context lines → both sides. Deletions → left only. Additions → right only.
  * Adjacent deletion/addition blocks get zipped into paired modification rows.
  */
+// woke2 impl DV-RC1, DV-RC2, DV-RC3, DV-RC4
 export function computeRows(hunks: DiffHunk[]): SideBySideRow[] {
   const rows: SideBySideRow[] = []
 
@@ -91,6 +93,7 @@ function pushSlice(
   }
 }
 
+// woke2 impl DV-SC1
 function measureIndent(line: string): number {
   let indent = 0
   for (const ch of line) {
@@ -106,6 +109,7 @@ function measureIndent(line: string): number {
  * Uses indentation as a heuristic: lines whose indent level increases and
  * persists to the end of the hidden range are scope openers.
  */
+// woke2 impl DV-SC2, DV-SC3, DV-SC4, DV-SC5
 export function computeStickyLines(
   rows: SideBySideRow[],
   startIndex: number,
@@ -166,6 +170,7 @@ export function computeStickyLines(
  * boundaries (e.g. a closing brace). When found, the visible context starts after
  * the last such boundary so that unrelated scope lines stay hidden.
  */
+// woke2 impl DV-SB1, DV-SB2
 function computeSmartBottom(
   rows: SideBySideRow[],
   runStart: number,
@@ -201,6 +206,7 @@ function computeSmartBottom(
  * Each region tracks how many extra lines are revealed from the top and bottom
  * via the expansions map. Chevron clicks increment these values by EXPAND_STEP.
  */
+// woke2 impl DV-CL1, DV-CL2, DV-CL3, DV-CL4, DV-CL5, DV-CL6, DV-CL7
 export function collapseRows(
   rows: SideBySideRow[],
   expansions: Map<number, RegionExpansion>,

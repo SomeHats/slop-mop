@@ -23,6 +23,7 @@ function orphaned(): ProjectionResult {
   return { kind: "orphaned", reason: "line_deleted" }
 }
 
+// woke2 test CFE-ST1
 describe("isSendable", () => {
   test("located → true; orphaned/null → false", () => {
     expect(isSendable(located())).toBe(true)
@@ -32,6 +33,7 @@ describe("isSendable", () => {
   })
 })
 
+// woke2 test CFE-ST2
 describe("shouldAutoStageNew", () => {
   test("first comment in the session → stage", () => {
     expect(shouldAutoStageNew([], new Map(), new Set())).toBe(true)
@@ -77,6 +79,7 @@ describe("shouldAutoStageNew", () => {
   })
 })
 
+// woke2 test CFE-ST3, CFE-ST4, CFE-ST5
 describe("reconcileStaged", () => {
   test("returns same reference when nothing dropped", () => {
     const staged = new Set(["a"])
@@ -120,6 +123,7 @@ describe("reconcileStaged", () => {
   })
 })
 
+// woke2 test CFE-ST6
 describe("allSendableIds", () => {
   test("returns only located comments", () => {
     const out = allSendableIds(

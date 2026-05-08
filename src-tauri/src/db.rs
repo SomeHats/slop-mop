@@ -7,6 +7,7 @@ use crate::error::Error;
 pub struct Db(pub Mutex<Connection>);
 
 impl Db {
+    // woke2 impl DB-O1, DB-O2
     pub fn open(path: &std::path::Path) -> Result<Self, Error> {
         let conn = Connection::open(path).map_err(|e| Error::Database(e.to_string()))?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")
@@ -16,6 +17,7 @@ impl Db {
         Ok(db)
     }
 
+    // woke2 impl DB-O3
     #[cfg(test)]
     pub fn open_in_memory() -> Result<Self, Error> {
         let conn =
@@ -27,6 +29,7 @@ impl Db {
         Ok(db)
     }
 
+    // woke2 impl DB-MG1, DB-MG3, DB-SC1, DB-SC2, DB-SC3, CMT-DB1, CMT-DB4
     fn migrate(&self) -> Result<(), Error> {
         let conn = self.0.lock().map_err(|e| Error::Database(e.to_string()))?;
         // History is now sourced from git log (see commits.rs); the legacy
@@ -59,6 +62,7 @@ impl Db {
         // doesn't need a schema migration. Fresh installs get the column
         // via this ALTER on the just-created table; subsequent boots see
         // the duplicate-column error and ignore it.
+        // woke2 impl DB-MG2
         match conn.execute(
             "ALTER TABLE projects ADD COLUMN settings_json TEXT NOT NULL DEFAULT '{}'",
             [],

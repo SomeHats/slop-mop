@@ -21,16 +21,19 @@ export function CommentComposer({
   const [value, setValue] = useState("")
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // woke2 impl CFE-CP1
   useEffect(() => {
     textareaRef.current?.focus()
   }, [])
 
+  // woke2 impl CFE-CP2
   const submit = (): void => {
     const trimmed = value.trim()
     if (!trimmed) return
     onSubmit(trimmed)
   }
 
+  // woke2 impl CFE-CP3
   const label = rangeEnd === null ? `Line ${rangeStart}` : `Lines ${rangeStart}–${rangeEnd}`
 
   return (
@@ -47,9 +50,11 @@ export function CommentComposer({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
+          // woke2 impl CFE-CP4
           if (e.key === "Escape") {
             e.preventDefault()
             onCancel()
+            // woke2 impl CFE-CP5
           } else if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
             e.preventDefault()
             submit()

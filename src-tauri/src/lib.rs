@@ -15,6 +15,7 @@ use tauri::Manager;
 
 /// Tracks the label of the last window that was destroyed, so the run-loop
 /// can decide whether to quit or reopen the picker.
+// woke2 impl WIN-RL1
 struct LastDestroyedLabel(Mutex<String>);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -66,6 +67,7 @@ pub fn run() {
             comments::project_comments,
             comments::anchor_for_workdir,
         ])
+        // woke2 impl WIN-RL4
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 if let Some(state) = window.try_state::<LastDestroyedLabel>() {
@@ -84,6 +86,7 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
+        // woke2 impl WIN-RL2, WIN-RL3
         .run(|app, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
                 if app.webview_windows().is_empty() {

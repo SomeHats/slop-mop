@@ -57,6 +57,7 @@ export type DiffLayoutInput = {
  * Walks the row list once and produces an in-flow slot list plus the absolute
  * overlay positions. Pure: no React, no DOM access.
  */
+// woke2 impl DV-LY1, DV-LY2, DV-LY3
 export function computeDiffLayout(input: DiffLayoutInput): DiffLayout {
   const { rows, commentsByAnchorLine, commentHeights, rowHeightPx } = input
   const slots: DiffSlot[] = []
@@ -111,6 +112,7 @@ export function computeDiffLayout(input: DiffLayoutInput): DiffLayout {
  * view. Uses the projected `end` when present (so the card sits below the last
  * line of a multi-line range), otherwise the projected `start`.
  */
+// woke2 impl DV-LY4
 export function commentAnchorLine(projectionEnd: number | null, projectionStart: number): number {
   return projectionEnd ?? projectionStart
 }

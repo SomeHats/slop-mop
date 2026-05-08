@@ -11,6 +11,7 @@ export type InlineCommentCardProps = {
  * full diff width (parent positions it absolutely with `left-0 right-0`); the
  * card itself just renders contents + a delete affordance.
  */
+// woke2 impl DV-IC1, DV-IC2
 export function InlineCommentCard({
   comment,
   onDelete,

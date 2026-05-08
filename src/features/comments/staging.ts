@@ -1,6 +1,7 @@
 import type { Comment, ProjectionResult } from "@/lib/types"
 
 /** A comment is sendable iff its workdir projection has resolved as `located`. */
+// woke2 impl CFE-ST1
 export function isSendable(p: ProjectionResult | null | undefined): boolean {
   return p?.kind === "located"
 }
@@ -10,6 +11,7 @@ export function isSendable(p: ProjectionResult | null | undefined): boolean {
  *   - there are no sendable comments yet (first comment in the session), or
  *   - every existing sendable comment is already staged (preserves "select all").
  */
+// woke2 impl CFE-ST2
 export function shouldAutoStageNew(
   prevComments: Comment[],
   workdirProjections: Map<string, ProjectionResult>,
@@ -27,6 +29,7 @@ export function shouldAutoStageNew(
  * to located. Returns the previous reference unchanged when nothing dropped, so
  * callers can short-circuit re-renders cheaply.
  */
+// woke2 impl CFE-ST3, CFE-ST4, CFE-ST5
 export function reconcileStaged(
   staged: ReadonlySet<string>,
   comments: Comment[],
@@ -52,6 +55,7 @@ export function reconcileStaged(
 }
 
 /** Set of every sendable comment id (use as the "select all" target). */
+// woke2 impl CFE-ST6
 export function allSendableIds(
   comments: Comment[],
   workdirProjections: Map<string, ProjectionResult>,

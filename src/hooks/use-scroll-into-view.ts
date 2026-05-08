@@ -9,6 +9,7 @@ const PADDING = 12
  * doesn't fit, pins the top of the element to the top of the viewport.
  * Adds a small padding so content doesn't sit flush against the edge.
  */
+// woke2 impl SV-1, SV-2, SV-3, SV-4
 export function useScrollIntoView(): {
   ref: React.RefObject<HTMLDivElement | null>
   scrollAfterExpand: () => void

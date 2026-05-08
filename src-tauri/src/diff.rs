@@ -39,6 +39,7 @@ pub struct FileDiff {
     pub deletions: u32,
 }
 
+// woke2 impl DIF-L4
 fn delta_to_status(delta: Delta) -> &'static str {
     match delta {
         Delta::Added => "added",
@@ -56,6 +57,7 @@ fn delta_to_status(delta: Delta) -> &'static str {
 
 /// Diff a commit against its first parent. For root commits (no parent),
 /// returns a tree-to-empty diff so additions show up against nothing.
+// woke2 impl DIF-S1, DIF-S2, DIF-S3
 fn diff_commit_vs_parent<'a>(repo: &'a Repository, hash: &str) -> Result<git2::Diff<'a>, Error> {
     let commit = repo
         .revparse_single(hash)
@@ -80,6 +82,7 @@ fn stats_from_diff(diff: &git2::Diff<'_>) -> Result<(u32, u32), Error> {
     Ok((stats.insertions() as u32, stats.deletions() as u32))
 }
 
+// woke2 impl DIF-S4, DIF-S5
 #[tauri::command]
 pub fn batch_diff_stats(
     project_path: String,
@@ -135,6 +138,7 @@ fn head_tree(repo: &Repository) -> Result<Tree<'_>, Error> {
 /// `newer_hash` is the newer end (None means workdir + index).
 ///
 /// Both None: workdir-only — diff HEAD vs working tree (live changes).
+// woke2 impl DIF-R1, DIF-R2, DIF-R3, DIF-R4, DIF-R5, DIF-R6, DIF-L1, DIF-L2, DIF-L3
 #[tauri::command]
 pub fn get_range_diff(
     project_path: String,
@@ -280,6 +284,7 @@ mod tests {
             .unwrap()
     }
 
+    // woke2 test DIF-L4
     #[test]
     fn delta_to_status_covers_known_variants() {
         assert_eq!(delta_to_status(Delta::Added), "added");
@@ -289,6 +294,7 @@ mod tests {
         assert_eq!(delta_to_status(Delta::Unmodified), "unknown");
     }
 
+    // woke2 test DIF-S1, DIF-S4
     #[test]
     fn batch_diff_stats_counts_root_and_modification_commits() {
         let dir = TempDir::new().unwrap();
@@ -320,6 +326,7 @@ mod tests {
         assert_eq!(stats[1].deletions, 1);
     }
 
+    // woke2 test DIF-S5
     #[test]
     fn batch_diff_stats_errors_on_non_repo() {
         let dir = TempDir::new().unwrap();

@@ -159,6 +159,7 @@ function SideBySideDiffInner({
 
   // Drop measured heights for entries that no longer exist (comments removed
   // from the inline list, composer closed) so the map doesn't grow unbounded.
+  // woke2 impl DV-CC7
   const composerOpen = composer !== null
   useEffect(() => {
     setCommentHeights((prev) => {
@@ -177,6 +178,7 @@ function SideBySideDiffInner({
   // Single ResizeObserver per diff. Cards register their element via the ref
   // callback below; height changes feed back into commentHeights state, which
   // re-runs the layout pass.
+  // woke2 impl DV-CC6
   useEffect(() => {
     const elMap = elToCommentRef.current
     const obs = new ResizeObserver((entries) => {
@@ -227,6 +229,7 @@ function SideBySideDiffInner({
   // opening the composer so we never let the user write a comment on a line
   // they can't anchor to. Listening at window-level handles mouseups outside
   // the diff.
+  // woke2 impl DV-CC2, DV-CC3, DV-CC4, DV-CC5
   useEffect(() => {
     if (!pending) return
     const onUp = (): void => {
@@ -275,6 +278,7 @@ function SideBySideDiffInner({
     }
   }, [scrollLineRef])
 
+  // woke2 impl DV-CC1
   const handleLineMouseDown = useCallback(
     (lineNo: number) =>
       (e: React.MouseEvent): void => {

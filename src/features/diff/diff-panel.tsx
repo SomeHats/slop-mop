@@ -36,6 +36,7 @@ type DiffPanelProps = {
   handleRef?: React.MutableRefObject<DiffPanelHandle | null> | undefined
 }
 
+// woke2 impl DV-PN1, DV-PN2, DV-PN3, DV-PN4, DV-PN5, DV-PN6, DV-PN7, DV-PN8
 export function DiffPanel({
   fileDiffs,
   isLoading,

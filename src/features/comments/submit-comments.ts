@@ -14,6 +14,7 @@ export type SubmittableComment = {
  * (orphaned, file deleted, projection still pending). The staging UI already
  * filters these out, so a non-null result is the expected case.
  */
+// woke2 impl CFE-SM1, CFE-SM2, CFE-SM3
 export function commentForSubmit(c: CommentWithProjection): SubmittableComment | null {
   if (c.sessionProjection?.kind !== "located") return null
   return {
@@ -24,6 +25,7 @@ export function commentForSubmit(c: CommentWithProjection): SubmittableComment |
   }
 }
 
+// woke2 impl CFE-SM4
 function rangeLabel(start: number, end: number | null): string {
   // ASCII hyphen on purpose — this is going into a model prompt, not the UI
   // (where we use an em dash via comments-format#rangeLabel).
@@ -35,6 +37,7 @@ function rangeLabel(start: number, end: number | null): string {
  * `### path:lines` heading followed by the body, separated from neighbors by
  * a blank line. Empty input → empty string.
  */
+// woke2 impl CFE-SM5, CFE-SM6
 export function formatCommentsForSubmit(items: SubmittableComment[]): string {
   return items
     .map((it) => `### ${it.filePath}:${rangeLabel(it.start, it.end)}\n${it.contents}`)

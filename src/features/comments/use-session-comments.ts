@@ -39,6 +39,7 @@ export type UseSessionCommentsResult = {
  *     reflects what the agent will see when comments are sent — that may
  *     diverge from what's visible in the current diff view.
  */
+// woke2 impl CFE-HK12
 export function useSessionComments(
   projectPath: string,
   sessionId: string | null,
@@ -66,6 +67,7 @@ export function useSessionComments(
 
   // Initial load + reload when sessionId changes. Also resets staged set so
   // staging is per-session and doesn't leak across switches.
+  // woke2 impl CFE-HK1, CFE-HK2, CFE-HK3
   useEffect(() => {
     setStaged(new Set())
     if (!sessionId) {
@@ -86,6 +88,7 @@ export function useSessionComments(
 
   // Diff-view projection: target follows the selection's `newer` end, or
   // workdir (None) for any view that includes uncommitted changes.
+  // woke2 impl CFE-HK4, CFE-HK6
   useEffect(() => {
     if (comments.length === 0) {
       setProjections(new Map())
@@ -108,6 +111,7 @@ export function useSessionComments(
   // Workdir projection: always targets None (workdir). Independent of the
   // selection so the staging UI reflects what the agent will see, not what
   // the user happens to be looking at.
+  // woke2 impl CFE-HK5, CFE-HK6
   useEffect(() => {
     if (comments.length === 0) {
       setWorkdirProjections(new Map())
@@ -130,6 +134,7 @@ export function useSessionComments(
     setStaged((prev) => reconcileStaged(prev, comments, workdirProjections))
   }, [comments, workdirProjections])
 
+  // woke2 impl CFE-HK7
   const add = useCallback((c: Comment): void => {
     const prevComments = commentsRef.current
     const proj = workdirProjectionsRef.current
@@ -142,6 +147,7 @@ export function useSessionComments(
     })
   }, [])
 
+  // woke2 impl CFE-HK8
   const remove = useCallback(async (id: string): Promise<void> => {
     await tauri.deleteComment(id)
     setComments((prev) => prev.filter((c) => c.id !== id))
@@ -153,6 +159,7 @@ export function useSessionComments(
     })
   }, [])
 
+  // woke2 impl CFE-HK9
   const toggleStaged = useCallback((id: string): void => {
     setStaged((prev) => {
       const next = new Set(prev)
@@ -162,6 +169,7 @@ export function useSessionComments(
     })
   }, [])
 
+  // woke2 impl CFE-HK10
   const setAllStaged = useCallback((checked: boolean): void => {
     setStaged(
       checked ? allSendableIds(commentsRef.current, workdirProjectionsRef.current) : new Set(),
@@ -176,6 +184,7 @@ export function useSessionComments(
     stagedRef.current = staged
   }, [staged])
 
+  // woke2 impl CFE-HK11
   const prepareSubmit = useCallback((): { ids: string[]; items: SubmittableComment[] } => {
     const stagedSet = stagedRef.current
     const wp = workdirProjectionsRef.current

@@ -13,6 +13,7 @@ const baseComment: Comment = {
   created_at: "2026-05-02T00:00:00Z",
 }
 
+// woke2 test CFE-FM1, CFE-FM4
 describe("rangeLabel", () => {
   it("formats a single line as `:N`", () => {
     expect(rangeLabel(7, null)).toBe(":7")
@@ -23,6 +24,7 @@ describe("rangeLabel", () => {
   })
 })
 
+// woke2 test CFE-FM2, CFE-FM3, CFE-FM4
 describe("displayLocation", () => {
   it("falls back to anchor coords while projection is unresolved", () => {
     expect(displayLocation(baseComment, null)).toBe("src/old.ts:5–9")
@@ -50,6 +52,7 @@ describe("displayLocation", () => {
   })
 })
 
+// woke2 test CFE-FM5
 describe("isOrphaned", () => {
   it("is false for null and located projections", () => {
     expect(isOrphaned(null)).toBe(false)

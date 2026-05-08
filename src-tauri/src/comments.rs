@@ -90,6 +90,7 @@ pub enum AnchorForWorkdir {
 /// it's strictly greater than `start` (enforced at the storage layer). Any
 /// deletion anywhere in `[start, end]` orphans the whole range — a comment
 /// that no longer covers what the user marked is no longer locatable.
+// woke2 impl CMT-PJ1, CMT-PJ2, CMT-PJ3, CMT-PJ4, CMT-PJ5
 pub fn project_range(change: &FileChange, start: u32, end: Option<u32>) -> ProjectionResult {
     let (hunks, renamed_path): (&[HunkRange], Option<String>) = match change {
         FileChange::Deleted => {
@@ -123,6 +124,7 @@ pub fn project_range(change: &FileChange, start: u32, end: Option<u32>) -> Proje
 
 /// Project a single line number through the hunks. Caller has already
 /// verified the line isn't deleted.
+// woke2 impl CMT-PJ6, CMT-PJ7, CMT-PJ8, CMT-PJ9, CMT-PJ10
 fn project_line(hunks: &[HunkRange], line: u32) -> u32 {
     let mut offset: i64 = 0;
     for h in hunks {
@@ -152,6 +154,7 @@ fn project_line(hunks: &[HunkRange], line: u32) -> u32 {
     apply_offset(line, offset)
 }
 
+// woke2 impl CMT-PJ11
 fn apply_offset(line: u32, offset: i64) -> u32 {
     let v = line as i64 + offset;
     if v < 1 { 1 } else { v as u32 }
@@ -161,6 +164,7 @@ fn apply_offset(line: u32, offset: i64) -> u32 {
 
 /// Compute the file-level change between `anchor_commit` and `target` (None =
 /// workdir + index) for the file at `anchor_path` *as of* the anchor commit.
+// woke2 impl CMT-FC1, CMT-FC2, CMT-FC3, CMT-FC4, CMT-FC5, CMT-FC6
 pub fn compute_file_change(
     repo: &Repository,
     anchor_commit: &str,
@@ -238,6 +242,7 @@ fn commit_tree<'a>(repo: &'a Repository, hash: &str) -> Result<Tree<'a>, Error> 
 }
 
 /// Walk the diff and collect the hunks for the file at `delta_idx`.
+// woke2 impl CMT-FC7
 fn collect_hunks_for_delta(diff: &git2::Diff<'_>, delta_idx: usize) -> Result<Vec<HunkRange>, Error> {
     use std::cell::RefCell;
 
@@ -317,6 +322,7 @@ enum WorkdirFile {
     Modified(Vec<WorkdirHunk>),
 }
 
+// woke2 impl CMT-AW1, CMT-AW2, CMT-AW3, CMT-AW4
 fn collect_workdir_file(
     repo: &Repository,
     head_hash: &str,
@@ -420,6 +426,7 @@ fn collect_workdir_file(
 
 /// Translate a workdir line number into its HEAD line number, or None if the
 /// line was added in workdir (no HEAD counterpart).
+// woke2 impl CMT-AW5, CMT-AW6
 fn workdir_to_head_line(file: &WorkdirFile, line: u32) -> Option<u32> {
     match file {
         WorkdirFile::Identity => Some(line),
@@ -446,6 +453,7 @@ fn workdir_to_head_line(file: &WorkdirFile, line: u32) -> Option<u32> {
 
 // ─── Tauri commands ───────────────────────────────────────────────────────────
 
+// woke2 impl CMT-CR1, CMT-DB2, CMT-DB3
 #[tauri::command]
 pub fn create_comment(
     db: State<'_, Db>,
@@ -490,6 +498,7 @@ pub fn create_comment(
     Ok(comment)
 }
 
+// woke2 impl CMT-CR2
 #[tauri::command]
 pub fn list_comments(db: State<'_, Db>, session_id: String) -> Result<Vec<Comment>, Error> {
     let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
@@ -507,6 +516,7 @@ pub fn list_comments(db: State<'_, Db>, session_id: String) -> Result<Vec<Commen
     Ok(rows)
 }
 
+// woke2 impl CMT-CR3
 #[tauri::command]
 pub fn delete_comment(db: State<'_, Db>, id: String) -> Result<(), Error> {
     let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
@@ -515,6 +525,7 @@ pub fn delete_comment(db: State<'_, Db>, id: String) -> Result<(), Error> {
     Ok(())
 }
 
+// woke2 impl CMT-PC1, CMT-PC2
 #[tauri::command]
 pub fn project_comments(
     db: State<'_, Db>,
@@ -564,6 +575,7 @@ pub fn project_comments(
 /// `Uncommittable` if any line in the range was added in workdir (no HEAD
 /// counterpart). Used by the frontend when opening the comment composer in a
 /// workdir-inclusive view.
+// woke2 impl CMT-AW7, CMT-AW8, CMT-AW9
 #[tauri::command]
 pub fn anchor_for_workdir(
     project_path: String,
@@ -687,11 +699,13 @@ mod tests {
         }
     }
 
+    // woke2 test CMT-PJ1
     #[test]
     fn unchanged_single_line_is_identity() {
         assert_eq!(project_range(&FileChange::Unchanged, 7, None), loc(7, None));
     }
 
+    // woke2 test CMT-PJ1, CMT-PJ4
     #[test]
     fn unchanged_range_is_identity() {
         assert_eq!(
@@ -700,6 +714,7 @@ mod tests {
         );
     }
 
+    // woke2 test CMT-PJ2
     #[test]
     fn deleted_file_orphans() {
         assert_eq!(
@@ -710,6 +725,7 @@ mod tests {
         );
     }
 
+    // woke2 test CMT-PJ3
     #[test]
     fn rename_with_no_hunks_keeps_lines_changes_path() {
         let change = FileChange::Renamed {
@@ -722,6 +738,7 @@ mod tests {
         );
     }
 
+    // woke2 test CMT-PJ6
     #[test]
     fn pure_addition_before_line_shifts_down() {
         // Insert 3 lines after old line 2; line 5 → line 8.
@@ -729,6 +746,7 @@ mod tests {
         assert_eq!(project_range(&change, 5, None), loc(8, None));
     }
 
+    // woke2 test CMT-PJ6
     #[test]
     fn pure_addition_after_line_does_not_shift() {
         // Insert 3 lines after old line 5; line 5 stays at 5.
@@ -736,6 +754,7 @@ mod tests {
         assert_eq!(project_range(&change, 5, None), loc(5, None));
     }
 
+    // woke2 test CMT-PJ7
     #[test]
     fn pure_addition_at_top_shifts_everything() {
         // Insert 4 lines at top (old_start=0); line 1 shifts to 5.
@@ -744,6 +763,7 @@ mod tests {
         assert_eq!(project_range(&change, 7, None), loc(11, None));
     }
 
+    // woke2 test CMT-PJ8
     #[test]
     fn pure_deletion_before_line_shifts_up() {
         // Delete old lines 2..=4 (3 lines); line 10 → 7.
@@ -751,6 +771,7 @@ mod tests {
         assert_eq!(project_range(&change, 10, None), loc(7, None));
     }
 
+    // woke2 test CMT-PJ8
     #[test]
     fn pure_deletion_after_line_does_not_shift() {
         // Delete old lines 7..=9; line 3 stays at 3.
@@ -758,6 +779,7 @@ mod tests {
         assert_eq!(project_range(&change, 3, None), loc(3, None));
     }
 
+    // woke2 test CMT-PJ10
     #[test]
     fn mixed_add_then_delete_before_line_nets_offset() {
         // Add 5 before line 1, delete lines 8..=9 (2 dels); line 20 →
@@ -766,6 +788,7 @@ mod tests {
         assert_eq!(project_range(&change, 20, None), loc(23, None));
     }
 
+    // woke2 test CMT-PJ9
     #[test]
     fn context_line_inside_hunk_maps_via_surviving_count() {
         // Hunk: old [10..=14] (5 lines), 2 of them deleted (11, 13);
@@ -785,6 +808,7 @@ mod tests {
         assert_eq!(project_range(&change, 14, None), loc(12, None));
     }
 
+    // woke2 test CMT-PJ5
     #[test]
     fn deleted_line_is_orphaned() {
         let change = modified(vec![del(5, 1, 5)]);
@@ -796,6 +820,7 @@ mod tests {
         );
     }
 
+    // woke2 test CMT-PJ5
     #[test]
     fn range_with_start_deleted_orphans() {
         let change = modified(vec![del(5, 1, 5)]);
@@ -807,6 +832,7 @@ mod tests {
         );
     }
 
+    // woke2 test CMT-PJ5
     #[test]
     fn range_with_end_deleted_orphans() {
         let change = modified(vec![del(8, 1, 8)]);
@@ -818,6 +844,7 @@ mod tests {
         );
     }
 
+    // woke2 test CMT-PJ5
     #[test]
     fn range_with_interior_deletion_orphans() {
         // Endpoints 5 and 9 survive; interior 7 deleted.
@@ -852,6 +879,7 @@ mod tests {
         assert_eq!(project_range(&change, 5, Some(11)), loc(5, Some(13)));
     }
 
+    // woke2 test CMT-PJ10
     #[test]
     fn multiple_hunks_shift_accumulates_after_all() {
         // Two pure-addition hunks before line 100.
@@ -941,6 +969,7 @@ mod tests {
         (1..=10).map(|i| format!("line {i}\n")).collect()
     }
 
+    // woke2 test CMT-FC3, CMT-PJ6
     #[test]
     fn integration_addition_above_shifts_line() {
         let dir = TempDir::new().unwrap();
@@ -962,6 +991,7 @@ mod tests {
         assert_eq!(result, loc(8, None));
     }
 
+    // woke2 test CMT-FC7, CMT-PJ5
     #[test]
     fn integration_deletion_orphans() {
         let dir = TempDir::new().unwrap();
@@ -987,6 +1017,7 @@ mod tests {
         ));
     }
 
+    // woke2 test CMT-FC2, CMT-FC6
     #[test]
     fn integration_rename_follows_path() {
         let dir = TempDir::new().unwrap();
@@ -1007,6 +1038,7 @@ mod tests {
         }
     }
 
+    // woke2 test CMT-FC5, CMT-PJ2
     #[test]
     fn integration_file_deletion_orphans() {
         let dir = TempDir::new().unwrap();
@@ -1032,6 +1064,7 @@ mod tests {
         ));
     }
 
+    // woke2 test CMT-FC3
     #[test]
     fn integration_workdir_target() {
         let dir = TempDir::new().unwrap();
@@ -1078,17 +1111,20 @@ mod tests {
         }
     }
 
+    // woke2 test CMT-AW1
     #[test]
     fn workdir_to_head_identity_returns_input() {
         assert_eq!(workdir_to_head_line(&WorkdirFile::Identity, 7), Some(7));
     }
 
+    // woke2 test CMT-AW2
     #[test]
     fn workdir_to_head_entirely_added_is_uncommittable() {
         assert_eq!(workdir_to_head_line(&WorkdirFile::EntirelyAdded, 1), None);
         assert_eq!(workdir_to_head_line(&WorkdirFile::EntirelyAdded, 99), None);
     }
 
+    // woke2 test CMT-AW5
     #[test]
     fn workdir_to_head_outside_hunk_uses_offset() {
         // 3 lines added at the top: workdir 10 → head 7.
@@ -1096,6 +1132,7 @@ mod tests {
         assert_eq!(workdir_to_head_line(&file, 10), Some(7));
     }
 
+    // woke2 test CMT-AW4
     #[test]
     fn workdir_to_head_addition_inside_hunk_returns_none() {
         // Hunk: workdir lines 5..=7 are all additions.
@@ -1103,6 +1140,7 @@ mod tests {
         assert_eq!(workdir_to_head_line(&file, 6), None);
     }
 
+    // woke2 test CMT-AW4
     #[test]
     fn workdir_to_head_context_inside_hunk_uses_recorded_old() {
         // workdir [5..=7]: position 0 is addition, position 1 is context (head 5),
@@ -1113,6 +1151,7 @@ mod tests {
         assert_eq!(workdir_to_head_line(&file, 7), None);
     }
 
+    // woke2 test CMT-AW6
     #[test]
     fn workdir_to_head_after_pure_deletion_shifts_up() {
         // Pure deletion in HEAD→workdir: 2 lines removed at head [5..=6].
@@ -1122,6 +1161,7 @@ mod tests {
         assert_eq!(workdir_to_head_line(&file, 10), Some(12));
     }
 
+    // woke2 test CMT-AW8
     #[test]
     fn integration_anchor_workdir_context_line() {
         let dir = TempDir::new().unwrap();
@@ -1156,6 +1196,7 @@ mod tests {
         }
     }
 
+    // woke2 test CMT-AW7
     #[test]
     fn integration_anchor_workdir_addition_is_uncommittable() {
         let dir = TempDir::new().unwrap();
@@ -1180,6 +1221,7 @@ mod tests {
         assert_eq!(r, AnchorForWorkdir::Uncommittable);
     }
 
+    // woke2 test CMT-AW7
     #[test]
     fn integration_anchor_workdir_range_crossing_addition_is_uncommittable() {
         let dir = TempDir::new().unwrap();
@@ -1203,6 +1245,7 @@ mod tests {
         assert_eq!(r, AnchorForWorkdir::Uncommittable);
     }
 
+    // woke2 test CMT-AW1
     #[test]
     fn integration_anchor_workdir_unchanged_file_is_identity() {
         let dir = TempDir::new().unwrap();
@@ -1231,6 +1274,7 @@ mod tests {
         }
     }
 
+    // woke2 test CMT-AW2
     #[test]
     fn integration_anchor_workdir_untracked_file_is_uncommittable() {
         let dir = TempDir::new().unwrap();
@@ -1249,6 +1293,7 @@ mod tests {
         assert_eq!(r, AnchorForWorkdir::Uncommittable);
     }
 
+    // woke2 test CMT-DB2, CMT-DB3
     #[test]
     fn db_check_constraints_reject_invalid_ranges() {
         let db = Db::open_in_memory().unwrap();

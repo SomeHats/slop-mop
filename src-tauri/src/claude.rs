@@ -29,6 +29,7 @@ fn user_shell() -> String {
 
 /// Wrap a string in single quotes for safe inclusion in a shell command line.
 /// Embedded single quotes become `'\''` (close-quote, escaped quote, open-quote).
+// woke2 impl AC-SP6
 fn shell_quote(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('\'');
@@ -66,6 +67,7 @@ impl ClaudeManager {
         Self(Mutex::new(HashMap::new()))
     }
 
+    // woke2 impl AC-KL2
     pub fn kill_for_window(&self, label: &str) {
         let mut procs = match self.0.lock() {
             Ok(p) => p,
@@ -84,6 +86,7 @@ impl ClaudeManager {
     }
 }
 
+// woke2 impl AC-KL1
 fn shutdown_process(p: &ClaudeProcess) {
     if let Ok(mut c) = p.child.lock() {
         let _ = c.kill();
@@ -117,6 +120,7 @@ pub struct SpawnClaudeResult {
     pub agent_id: String,
 }
 
+// woke2 impl AC-SP1, AC-SP7
 #[tauri::command]
 pub fn spawn_claude(
     window: WebviewWindow,
@@ -209,6 +213,7 @@ pub fn spawn_claude(
     //    etc.). `exec` makes claude replace the shell process so signals and
     //    TTY ownership flow naturally.
     let pty_system = native_pty_system();
+    // woke2 impl AC-SP8
     let pair = pty_system
         .openpty(PtySize {
             rows: 40,
@@ -219,15 +224,19 @@ pub fn spawn_claude(
         .map_err(|e| Error::AgentSpawnFailed(format!("openpty failed: {e}")))?;
 
     let settings_arg = shell_quote(&settings_path.to_string_lossy());
+    // woke2 impl AC-SP4
     let mut shell_cmd = format!("exec claude --settings {settings_arg}");
     if resume {
+        // woke2 impl AC-SP5
         shell_cmd.push_str(" --resume");
     }
 
+    // woke2 impl AC-SP2
     let mut cmd = CommandBuilder::new(user_shell());
     cmd.arg("-ilc");
     cmd.arg(&shell_cmd);
     cmd.cwd(&project_path);
+    // woke2 impl AC-SP3
     cmd.env("TERM", "xterm-256color");
     // Pin truecolor so claude emits 24-bit RGB SGRs regardless of how the app
     // was launched. Without this, a bundled .app inherits an empty COLORTERM
@@ -256,6 +265,7 @@ pub fn spawn_claude(
     let child = Arc::new(Mutex::new(child));
 
     // 5. Reader thread → emit claude-output events.
+    // woke2 impl AC-IO1, AC-IO2
     {
         let app = app.clone();
         let id = agent_id.clone();
@@ -322,6 +332,7 @@ pub fn spawn_claude(
     Ok(SpawnClaudeResult { agent_id })
 }
 
+// woke2 impl AC-IO3
 #[tauri::command]
 pub fn write_claude_stdin(
     manager: State<'_, ClaudeManager>,
@@ -352,6 +363,7 @@ pub fn write_claude_stdin(
     Ok(())
 }
 
+// woke2 impl AC-IO4
 #[tauri::command]
 pub fn resize_claude(
     manager: State<'_, ClaudeManager>,
@@ -381,6 +393,7 @@ pub fn resize_claude(
     Ok(())
 }
 
+// woke2 impl AC-KL1
 #[tauri::command]
 pub fn kill_claude(manager: State<'_, ClaudeManager>, agent_id: String) -> Result<(), Error> {
     let mut procs = manager
@@ -435,6 +448,7 @@ fn run_hook_server(app: AppHandle, window_label: String, server: Arc<Server>) {
         server.server_addr()
     );
     // recv_timeout lets us exit promptly when `unblock()` is called on shutdown.
+    // woke2 impl AC-HS1
     loop {
         match server.recv_timeout(Duration::from_millis(500)) {
             Ok(Some(req)) => handle_hook_request(&app, &window_label, req),
@@ -457,6 +471,7 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
         req.remote_addr()
     );
 
+    // woke2 impl AC-HS2
     if *req.method() != Method::Post {
         let _ = req.respond(Response::from_string("method not allowed").with_status_code(405));
         return;
@@ -467,6 +482,7 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
     let (project_id, agent_id) = parse_query(&url);
 
     let mut body = String::new();
+    // woke2 impl AC-HS3
     if let Err(e) = req.as_reader().read_to_string(&mut body) {
         eprintln!("[hook] failed to read body: {e}");
         let _ = req.respond(Response::from_string("").with_status_code(200));
@@ -487,6 +503,7 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
         "/prompt" => handle_prompt(app, window_label, &project_id, &agent_id, &parsed),
         "/session-start" => handle_session_start(app, window_label, &agent_id, &parsed),
         "/stop" => handle_stop(app, window_label, &project_id, &agent_id, &parsed),
+        // woke2 impl AC-HS5
         other => eprintln!("[hook] unknown path: {other}"),
     }
 
@@ -496,6 +513,7 @@ fn handle_hook_request(app: &AppHandle, window_label: &str, mut req: tiny_http::
 
 /// UserPromptSubmit: stash the prompt for the upcoming Stop, and commit any
 /// pre-existing uncommitted work as a "check point" so Claude's diff is clean.
+// woke2 impl AC-PR1, AC-PR2, AC-PR3, AC-PR4, AC-PR5
 fn handle_prompt(
     app: &AppHandle,
     window_label: &str,
@@ -580,6 +598,7 @@ fn handle_prompt(
 /// emit `prompt-committed` so the chat sidebar picks it up. Used by both
 /// the checkpoint (UserPromptSubmit) and post-prompt (Stop) paths so they
 /// produce visually identical commits.
+// woke2 impl AC-EM1, AC-EM2, AC-EM3, AC-CM2, AC-CM3, AC-CM7, AC-CM8, AC-CM9
 #[allow(clippy::too_many_arguments)]
 fn commit_staged_and_emit(
     app: &AppHandle,
@@ -683,6 +702,7 @@ fn resolve_prefix(app: &AppHandle, project_id: &str, path: &Path) -> Option<Stri
 /// Slug segment: starts with an ASCII letter, followed by ASCII letters,
 /// digits, or `-`. Anything outside that grammar (parens, dots, spaces) is
 /// rejected and the subject returned unchanged.
+// woke2 impl AC-CM4, AC-CM6
 fn strip_subject_prefix(subject: &str) -> &str {
     let Some(idx) = subject.find(": ") else {
         return subject;
@@ -701,6 +721,7 @@ fn strip_subject_prefix(subject: &str) -> &str {
     }
 }
 
+// woke2 impl AC-CM5
 fn is_slug_segment(seg: &str) -> bool {
     let mut chars = seg.chars();
     match chars.next() {
@@ -715,23 +736,27 @@ fn is_slug_segment(seg: &str) -> bool {
 mod tests {
     use super::*;
 
+    // woke2 test AC-CM4
     #[test]
     fn strip_subject_prefix_handles_simple_prefix() {
         assert_eq!(strip_subject_prefix("feat: foo"), "foo");
         assert_eq!(strip_subject_prefix("Fix: foo"), "foo");
     }
 
+    // woke2 test AC-CM4
     #[test]
     fn strip_subject_prefix_handles_path_prefix() {
         assert_eq!(strip_subject_prefix("alex/feature: foo"), "foo");
         assert_eq!(strip_subject_prefix("alex/feature/sub: foo"), "foo");
     }
 
+    // woke2 test AC-CM6
     #[test]
     fn strip_subject_prefix_strips_only_first_match() {
         assert_eq!(strip_subject_prefix("feat: foo: bar"), "foo: bar");
     }
 
+    // woke2 test AC-CM4
     #[test]
     fn strip_subject_prefix_rejects_non_slug_chars() {
         // Parens, spaces, dots — leave alone.
@@ -746,6 +771,7 @@ mod tests {
         assert_eq!(strip_subject_prefix(""), "");
     }
 
+    // woke2 test AC-CM4
     #[test]
     fn strip_subject_prefix_rejects_empty_or_leading_slash() {
         // Empty prefix (`: foo`) — leave alone.
@@ -756,6 +782,7 @@ mod tests {
         assert_eq!(strip_subject_prefix("foo/: bar"), "foo/: bar");
     }
 
+    // woke2 test AC-CM5
     #[test]
     fn strip_subject_prefix_rejects_segment_starting_with_digit_or_hyphen() {
         // 1foo isn't a valid slug (must start with a letter).
@@ -768,6 +795,7 @@ mod tests {
 /// Stop: commit Claude's changes (if any) with the prompt as the message.
 /// Wraps `handle_stop_inner` so the agent-idle emit fires no matter which
 /// early-return branch the inner function takes.
+// woke2 impl AC-ST1
 fn handle_stop(
     app: &AppHandle,
     window_label: &str,
@@ -786,6 +814,7 @@ fn handle_stop(
     );
 }
 
+// woke2 impl AC-ST2, AC-ST3, AC-ST4
 fn handle_stop_inner(
     app: &AppHandle,
     window_label: &str,
@@ -858,6 +887,7 @@ fn first_line(s: &str) -> String {
 /// staged changes. Runs in the project cwd so claude can inspect the diff via
 /// its own bash tool. Returns the trimmed stdout (multi-line OK — first line
 /// is the subject, rest is the body).
+// woke2 impl AC-CM1
 fn generate_commit_message(cwd: &std::path::Path) -> Result<String, String> {
     let prompt = "Inspect the staged git changes (e.g. `git diff --cached`) and write a concise commit message for them. Output ONLY the commit message text — no markdown fencing, no quoting, no preamble. The first line must be a short subject in imperative mood under 70 chars; you may follow it with a blank line and a brief body. Do not use any sort of prefix to your commit message.";
     // Route through the user's shell so we get their full env (PATH, node
@@ -883,6 +913,7 @@ fn generate_commit_message(cwd: &std::path::Path) -> Result<String, String> {
     Ok(msg)
 }
 
+// woke2 impl AC-SS1, AC-SS2, AC-SS3
 fn handle_session_start(
     app: &AppHandle,
     window_label: &str,
@@ -924,6 +955,7 @@ fn handle_session_start(
     emit_to_window(app, window_label, "session-started", event);
 }
 
+// woke2 impl AC-HS4
 fn parse_query(url: &str) -> (String, String) {
     let mut project_id = String::new();
     let mut agent_id = String::new();

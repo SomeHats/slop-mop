@@ -20,6 +20,7 @@ import type { Selection } from "./lib/types"
 
 const project = window.__PROJECT
 
+// woke2 impl APP-RT1, APP-RT2
 export function App(): React.JSX.Element {
   const fullscreen = useFullscreen()
 
@@ -54,6 +55,7 @@ function ProjectApp({
   const [selection, setSelection] = useState<Selection | null>(null)
   const projectSettings = useProjectSettings(projectId)
 
+  // woke2 impl APP-SB1
   useEffect(() => {
     void startWatching(projectPath)
   }, [projectPath])
@@ -62,6 +64,7 @@ function ProjectApp({
   // the user changes the branch-prefix mode. The mode value isn't read in
   // the effect body — Rust re-reads the latest setting from the DB inside
   // refetchCommits — but we list it as a dep so the effect fires on change.
+  // woke2 impl APP-SB2
   // biome-ignore lint/correctness/useExhaustiveDependencies: mode used as a trigger
   useEffect(() => {
     if (session.sessionId === null) return
@@ -70,6 +73,7 @@ function ProjectApp({
 
   // When the Stop hook lands a new commit, jump straight into its diff so the
   // user sees what just changed instead of staring at a now-stale terminal.
+  // woke2 impl APP-SB3
   useEffect(() => {
     return session.onCommitLanded((commit) => {
       setSelection({ older: commit.commit_hash, newer: commit.commit_hash })
@@ -87,6 +91,7 @@ function ProjectApp({
   // right-side line numbers. In workdir mode we round-trip to the backend to
   // translate workdir lines to HEAD lines, rejecting lines that exist only
   // uncommitted (no immutable anchor).
+  // woke2 impl APP-CM1, APP-CM2
   const handleResolveAnchor = useCallback(
     async (filePath: string, start: number, end: number | null): Promise<ResolvedAnchor> => {
       if (selection?.newer) {
@@ -113,6 +118,7 @@ function ProjectApp({
     [sessionComments.remove],
   )
 
+  // woke2 impl APP-SS1, APP-SS2, APP-SS3, APP-SS4, APP-SS5, APP-SS6
   const handleSubmitStaged = useCallback((): void => {
     if (session.isBusy) return // belt-and-braces; the button is also disabled
     const { ids, items } = sessionComments.prepareSubmit()
@@ -134,6 +140,7 @@ function ProjectApp({
     setSelection(null)
   }, [session.isBusy, session.writeInput, sessionComments.prepareSubmit, sessionComments.remove])
 
+  // woke2 impl APP-CM3, APP-CM4
   const handleSubmitComment = useCallback(
     async (
       filePath: string,
@@ -156,6 +163,7 @@ function ProjectApp({
     [session.sessionId, sessionComments.add],
   )
 
+  // woke2 impl APP-JC1, APP-JC2
   const handleJumpToComment = useCallback(
     (commentId: string): void => {
       const item = sessionComments.comments.find((c) => c.comment.id === commentId)
@@ -177,6 +185,7 @@ function ProjectApp({
   // Workdir-inclusive views (selection.newer === null) are commentable too —
   // anchor resolution happens lazily per-click via handleResolveAnchor, which
   // rejects lines that exist only uncommitted.
+  // woke2 impl APP-LC7
   const commentingEnabled = !showTerminal && selection !== null
   // The `claude --resume` picker doesn't offer a "start new session" option, so we
   // overlay our own button while the user hasn't picked a session yet. Once the
@@ -185,6 +194,7 @@ function ProjectApp({
   const showNewSessionButton =
     showTerminal && session.resumeMode && session.sessionId === null && !session.isConnecting
 
+  // woke2 impl APP-LC1, APP-LC2, APP-LC3, APP-LC4, APP-LC5, APP-LC6
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <div

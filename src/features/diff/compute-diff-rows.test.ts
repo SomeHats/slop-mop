@@ -17,6 +17,7 @@ function add(content: string, lineNo: number): SideBySideRow {
   }
 }
 
+// woke2 test DV-SC2, DV-SC3, DV-SC4, DV-SC5
 describe("computeStickyLines", () => {
   test("keeps enclosing opener when next visible line is at deeper indent", () => {
     // Hidden:

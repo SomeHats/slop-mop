@@ -18,6 +18,7 @@ export function ProjectPicker(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
+  // woke2 impl PFE-PK1, PFE-PK4
   const loadRecent = useCallback(async () => {
     try {
       const projects = await listRecentProjects()
@@ -31,6 +32,7 @@ export function ProjectPicker(): React.JSX.Element {
     void loadRecent()
   }, [loadRecent])
 
+  // woke2 impl PFE-PK2, PFE-PK3
   const handleOpen = async (): Promise<void> => {
     setError(null)
     const selected = await open({ directory: true, multiple: false })
@@ -46,6 +48,7 @@ export function ProjectPicker(): React.JSX.Element {
     }
   }
 
+  // woke2 impl PFE-PK6
   const handleRemove = async (id: string): Promise<void> => {
     try {
       await removeProject(id)
@@ -55,6 +58,7 @@ export function ProjectPicker(): React.JSX.Element {
     }
   }
 
+  // woke2 impl PFE-PK6
   const handleSelectRecent = async (project: Project): Promise<void> => {
     setError(null)
     setLoading(true)
@@ -67,6 +71,7 @@ export function ProjectPicker(): React.JSX.Element {
     }
   }
 
+  // woke2 impl PFE-PK5, PFE-PK7
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <div data-tauri-drag-region className="h-12 shrink-0" />

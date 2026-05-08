@@ -34,6 +34,7 @@ type RowMeta = {
   index: number
 }
 
+// woke2 impl CHT-TM1
 function formatTime(unixSeconds: number): string {
   const d = new Date(unixSeconds * 1000)
   const hours = d.getHours().toString().padStart(2, "0")
@@ -41,6 +42,7 @@ function formatTime(unixSeconds: number): string {
   return `${hours}:${minutes}`
 }
 
+// woke2 impl CHT-SL5
 const DRAG_THRESHOLD_PX = 4
 
 export function ChatSidebar({
@@ -54,6 +56,7 @@ export function ChatSidebar({
 }: ChatSidebarProps): React.JSX.Element {
   // Rows: Current Session at the top, then commits in newest-first order
   // (matches `commits` from useClaudeSession).
+  // woke2 impl CHT-R1
   const rows: RowMeta[] = useMemo(() => {
     const list: RowMeta[] = [{ key: null, index: 0 }]
     for (let i = 0; i < commits.length; i++) {
@@ -94,6 +97,7 @@ export function ChatSidebar({
 
   // Always reset drag state on global mouseup so we don't leak state when
   // mouseup happens outside the sidebar.
+  // woke2 impl CHT-SL8
   useEffect(() => {
     const onUp = (): void => {
       dragAnchorRef.current = null
@@ -110,12 +114,14 @@ export function ChatSidebar({
     // mousedown, so the browser never fires a click — meaning a stale
     // `suppressClickRef=true` from that drag would silently swallow the
     // user's next real click. Clear it at the start of every new gesture.
+    // woke2 impl CHT-SL7
     suppressClickRef.current = false
     dragAnchorRef.current = key
     dragStartedRef.current = false
     mouseStartXYRef.current = { x: e.clientX, y: e.clientY }
   }
 
+  // woke2 impl CHT-SL4, CHT-SL6
   const handleMouseEnter = (key: RowKey, e: React.MouseEvent): void => {
     // `mouseStartXYRef.current === null` means no mousedown is active.
     const start = mouseStartXYRef.current
@@ -152,6 +158,7 @@ export function ChatSidebar({
     }
   }
 
+  // woke2 impl CHT-SL1, CHT-SL2
   const handleClick = (key: RowKey): void => {
     if (suppressClickRef.current) {
       suppressClickRef.current = false
@@ -168,6 +175,7 @@ export function ChatSidebar({
     }
   }
 
+  // woke2 impl CHT-SL3
   const handleDoubleClick = (key: RowKey): void => {
     suppressClickRef.current = false
     onSelect({ older: key, newer: key })
@@ -175,6 +183,7 @@ export function ChatSidebar({
 
   const lastRowIndex = rows.length - 1
 
+  // woke2 impl CHT-R2
   return (
     <div className="flex w-80 flex-col overflow-hidden border-r border-border bg-background">
       <ScrollArea className="min-h-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:!block">
@@ -187,6 +196,7 @@ export function ChatSidebar({
             const aboveLit = inRange && isInRange(row.index - 1)
             const belowLit = inRange && isInRange(row.index + 1)
 
+            // woke2 impl CHT-R5
             if (row.key === null) {
               return (
                 <div key="__current__" className="sticky top-0 z-10 bg-background">
@@ -219,6 +229,7 @@ export function ChatSidebar({
             const commit = commits[row.index - 1]
             if (!commit) return null
             const stats = diffStats.get(commit.commit_hash)
+            // woke2 impl CHT-R3, CHT-R4
             return (
               <Row
                 key={commit.commit_hash}
@@ -266,6 +277,7 @@ export function ChatSidebar({
   )
 }
 
+// woke2 impl CHT-PF1, CHT-PF2
 function stripPrefix(subject: string, prefix: string | null): string {
   if (prefix === null) return subject
   const head = `${prefix}: `
@@ -287,6 +299,7 @@ type RowProps = {
   children: React.ReactNode
 }
 
+// woke2 impl CHT-RL1, CHT-RL2, CHT-RL3, CHT-RL4, CHT-RL5
 function Row({
   rowKey,
   isFirst,

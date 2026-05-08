@@ -5,6 +5,7 @@ use crate::db::Db;
 use crate::project;
 
 /// Build the native menu bar for the app.
+// woke2 impl MNU-B1, MNU-B2, MNU-B3, MNU-B4
 pub fn build_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     let recent_submenu = build_recent_submenu(app)?;
 
@@ -46,6 +47,7 @@ pub fn build_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     Ok(menu)
 }
 
+// woke2 impl MNU-RC1, MNU-RC2
 fn build_recent_submenu(app: &AppHandle) -> Result<tauri::menu::Submenu<Wry>, tauri::Error> {
     let mut submenu = SubmenuBuilder::new(app, "Open Recent");
 
@@ -65,6 +67,7 @@ fn build_recent_submenu(app: &AppHandle) -> Result<tauri::menu::Submenu<Wry>, ta
 }
 
 /// Handle menu events dispatched from the Tauri runtime.
+// woke2 impl MNU-EV1, MNU-EV2, MNU-EV3
 pub fn handle_event(app: &AppHandle, event: &tauri::menu::MenuEvent) {
     let id = event.id().0.as_str();
 
@@ -114,6 +117,7 @@ fn handle_close_window(app: &AppHandle) {
 }
 
 /// Rebuild the Open Recent submenu from the database.
+// woke2 impl MNU-RF1
 pub fn refresh_recent_menu(app: &AppHandle) {
     if let Ok(menu) = build_menu(app) {
         let _ = app.set_menu(menu);

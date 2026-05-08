@@ -15,6 +15,7 @@ function selectionKey(sel: Selection | null): string {
   return `${sel.older ?? "_"}|${sel.newer ?? "_"}`
 }
 
+// woke2 impl RD-1, RD-2, RD-3, RD-4, RD-5
 export function useRangeDiff(projectPath: string, selection: Selection | null): UseRangeDiffResult {
   const [fileDiffs, setFileDiffs] = useState<FileDiff[]>([])
   const [isLoading, setIsLoading] = useState(false)

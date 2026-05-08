@@ -22,6 +22,7 @@ export function TerminalPanel({ session, visible }: TerminalPanelProps): React.J
     const host = hostRef.current
     if (!host) return
 
+    // woke2 impl TRM-S1, TRM-S2, TRM-S3, TRM-S4
     const term = new Terminal({
       fontFamily: '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace',
       fontSize: 13,
@@ -37,6 +38,7 @@ export function TerminalPanel({ session, visible }: TerminalPanelProps): React.J
     termRef.current = term
     fitRef.current = fit
 
+    // woke2 impl TRM-L1, TRM-L2, TRM-L3
     const doFit = (): void => {
       try {
         fit.fit()
@@ -52,16 +54,19 @@ export function TerminalPanel({ session, visible }: TerminalPanelProps): React.J
     const ro = new ResizeObserver(() => doFit())
     ro.observe(host)
 
+    // woke2 impl TRM-IO1
     const unsubOutput = onOutput((bytes) => {
       term.write(bytes)
     })
 
+    // woke2 impl TRM-IO2
     const dataDisposable = term.onData((data) => {
       writeInput(encoder.encode(data))
     })
 
     term.focus()
 
+    // woke2 impl TRM-C1
     return () => {
       ro.disconnect()
       dataDisposable.dispose()
@@ -75,6 +80,7 @@ export function TerminalPanel({ session, visible }: TerminalPanelProps): React.J
   // Focus/blur + refresh on visibility changes. The terminal stays in layout
   // (real dimensions) at all times so no resize is needed — just wake xterm's
   // renderer when it comes forward.
+  // woke2 impl TRM-V1, TRM-V2, TRM-V3
   useEffect(() => {
     const term = termRef.current
     if (!term) return

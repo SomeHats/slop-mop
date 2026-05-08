@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { cn } from "./utils"
 
+// woke2 test LIB-CN1, LIB-CN2, LIB-CN3
 describe("cn", () => {
   it("joins truthy class names and skips falsy ones", () => {
     expect(cn("a", "b", false && "c", null, undefined, "d")).toBe("a b d")

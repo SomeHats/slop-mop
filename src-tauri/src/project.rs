@@ -15,6 +15,7 @@ pub struct Project {
     pub opened_at: String,
 }
 
+// woke2 impl PRJ-ST4
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProjectSettings {
@@ -26,6 +27,7 @@ pub struct ProjectSettings {
 /// projects in Slop Mop: opening a worktree means Claude runs in the worktree
 /// and commits to the worktree's branch. Canonicalized so equivalent paths
 /// (symlinks, trailing slashes) map to the same project row.
+// woke2 impl PRJ-WD1, PRJ-WD2, PRJ-WD3, PRJ-WD4
 pub fn resolve_workdir(path: &Path) -> Result<PathBuf, Error> {
     let repo = git2::Repository::discover(path)
         .map_err(|_| Error::NotAGitRepo(path.display().to_string()))?;
@@ -49,6 +51,7 @@ fn get_project_name(path: &Path) -> String {
 
 /// Resolve a directory path to a git repo root, upsert into the DB, and return the project.
 /// Used by both the `open_project` command and `window::open_project_window`.
+// woke2 impl PRJ-UP1, PRJ-UP2
 pub fn upsert_project(db: &Db, path: &str) -> Result<Project, Error> {
     let workdir = resolve_workdir(Path::new(path))?;
     let workdir_path = workdir.to_string_lossy().to_string();
@@ -82,6 +85,7 @@ pub fn upsert_project(db: &Db, path: &str) -> Result<Project, Error> {
     Ok(project)
 }
 
+// woke2 impl PRJ-LS1
 pub fn list_projects(db: &Db) -> Result<Vec<Project>, Error> {
     let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
 
@@ -115,6 +119,7 @@ pub fn list_recent_projects(db: State<'_, Db>) -> Result<Vec<Project>, Error> {
     list_projects(&db)
 }
 
+// woke2 impl PRJ-RM1
 #[tauri::command]
 pub fn remove_project(db: State<'_, Db>, id: String) -> Result<(), Error> {
     let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
@@ -128,6 +133,7 @@ pub fn remove_project(db: State<'_, Db>, id: String) -> Result<(), Error> {
 /// Read the per-project settings JSON blob, deserializing into `ProjectSettings`.
 /// Returns the default settings if the row is missing or the JSON is malformed —
 /// settings are non-essential and we never want a parse error to break commits.
+// woke2 impl PRJ-ST1, PRJ-ST2
 pub fn read_project_settings(db: &Db, project_id: &str) -> Result<ProjectSettings, Error> {
     let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
     let json: Option<String> = conn
@@ -150,6 +156,7 @@ pub fn get_project_settings(
     read_project_settings(&db, &project_id)
 }
 
+// woke2 impl PRJ-ST3
 #[tauri::command]
 pub fn update_project_settings(
     db: State<'_, Db>,
@@ -167,6 +174,7 @@ pub fn update_project_settings(
     Ok(())
 }
 
+// woke2 impl PRJ-BR1
 #[tauri::command]
 pub fn get_head_branch(project_path: String) -> Option<String> {
     get_head_branch_name(Path::new(&project_path))
@@ -176,6 +184,7 @@ pub fn get_head_branch(project_path: String) -> Option<String> {
 /// current setting and current branch. Single source of truth for prefix
 /// derivation; both the commit path (claude.rs) and the sidebar seed
 /// (commits.rs) call this so they can't disagree.
+// woke2 impl PRJ-CP1, PRJ-CP2
 pub fn current_prefix(db: &Db, project_id: &str, path: &Path) -> Option<String> {
     let settings = read_project_settings(db, project_id).ok()?;
     let branch = get_head_branch_name(path)?;

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { batchDiffStats } from "@/lib/tauri"
 import type { DiffStats, SessionCommit } from "@/lib/types"
 
+// woke2 impl DS-1, DS-2, DS-3, DS-4
 export function useDiffStats(
   projectPath: string,
   commits: SessionCommit[],

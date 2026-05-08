@@ -5,8 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::Error;
 
+// woke2 impl GIT-TR1
 pub const SESSION_TRAILER_KEY: &str = "Slop-Mop-Session-Id";
 
+// woke2 impl GIT-BP6
 #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum BranchPrefixMode {
@@ -16,6 +18,7 @@ pub enum BranchPrefixMode {
     Feature,
 }
 
+// woke2 impl GIT-HD1, GIT-HD4
 pub fn get_head_commit_hash(path: &Path) -> Result<String, Error> {
     let repo = git2::Repository::discover(path)
         .map_err(|_| Error::NotAGitRepo(path.display().to_string()))?;
@@ -27,6 +30,7 @@ pub fn get_head_commit_hash(path: &Path) -> Result<String, Error> {
 /// Read the full commit message of HEAD. Used to populate the realtime
 /// `prompt-committed` event so the sidebar's hover-title has the same body
 /// the historical seed gets via `list_session_commits`.
+// woke2 impl GIT-HD2
 pub fn get_head_commit_message(path: &Path) -> Result<String, Error> {
     let repo = git2::Repository::discover(path)
         .map_err(|_| Error::NotAGitRepo(path.display().to_string()))?;
@@ -38,6 +42,7 @@ pub fn get_head_commit_message(path: &Path) -> Result<String, Error> {
 /// Resolve the current branch's short name (e.g. `alex/feature`). Returns
 /// `None` for detached HEAD or any other state where there's no branch to
 /// prefix with — callers treat `None` as "skip the prefix".
+// woke2 impl GIT-HD3
 pub fn get_head_branch_name(path: &Path) -> Option<String> {
     let repo = git2::Repository::discover(path).ok()?;
     let head = repo.head().ok()?;
@@ -54,6 +59,7 @@ pub fn get_head_branch_name(path: &Path) -> Option<String> {
 /// like `alex/feature/foo` keep `feature/foo` (matches the
 /// `<author>/<short-description>` convention where the description may
 /// itself contain slashes).
+// woke2 impl GIT-BP1, GIT-BP2, GIT-BP3, GIT-BP4, GIT-BP5
 pub fn derive_branch_prefix(branch: &str, mode: BranchPrefixMode) -> Option<String> {
     if branch.is_empty() {
         return None;
@@ -70,6 +76,7 @@ pub fn derive_branch_prefix(branch: &str, mode: BranchPrefixMode) -> Option<Stri
 
 /// True when the working tree (after `git add --all`) has staged changes.
 /// `git diff --cached --quiet` exits non-zero when the index differs from HEAD.
+// woke2 impl GIT-ST1, GIT-ST2
 pub fn stage_all_and_check_dirty(cwd: &Path) -> Result<bool, String> {
     let add = Command::new("git")
         .args(["add", "--all"])
@@ -94,6 +101,7 @@ pub fn stage_all_and_check_dirty(cwd: &Path) -> Result<bool, String> {
 /// real commits but shouldn't block our checkpoints. Always passes
 /// `--no-gpg-sign` to avoid pinentry prompts we can't answer. Caller is
 /// responsible for staging.
+// woke2 impl GIT-CO1, GIT-CO2, GIT-CO3, GIT-CO4, GIT-CO5
 pub fn commit_with_session_trailer(
     cwd: &Path,
     session_id: &str,
@@ -153,12 +161,14 @@ pub fn commit_with_session_trailer(
 mod tests {
     use super::*;
 
+    // woke2 test GIT-BP1
     #[test]
     fn derive_branch_prefix_none_returns_none_for_any_branch() {
         assert_eq!(derive_branch_prefix("alex/foo", BranchPrefixMode::None), None);
         assert_eq!(derive_branch_prefix("main", BranchPrefixMode::None), None);
     }
 
+    // woke2 test GIT-BP2
     #[test]
     fn derive_branch_prefix_full_returns_full_branch() {
         assert_eq!(
@@ -171,6 +181,7 @@ mod tests {
         );
     }
 
+    // woke2 test GIT-BP3
     #[test]
     fn derive_branch_prefix_feature_strips_first_segment() {
         assert_eq!(
@@ -184,6 +195,7 @@ mod tests {
         );
     }
 
+    // woke2 test GIT-BP4
     #[test]
     fn derive_branch_prefix_feature_falls_back_to_full_for_no_slash() {
         assert_eq!(
@@ -192,6 +204,7 @@ mod tests {
         );
     }
 
+    // woke2 test GIT-BP5
     #[test]
     fn derive_branch_prefix_returns_none_for_empty_branch() {
         for mode in [
@@ -203,6 +216,7 @@ mod tests {
         }
     }
 
+    // woke2 test GIT-HD3
     #[test]
     fn get_head_branch_name_returns_branch_in_normal_repo() {
         let dir = tempfile::tempdir().unwrap();
@@ -230,6 +244,7 @@ mod tests {
         );
     }
 
+    // woke2 test GIT-HD3
     #[test]
     fn get_head_branch_name_returns_none_when_detached() {
         let dir = tempfile::tempdir().unwrap();
