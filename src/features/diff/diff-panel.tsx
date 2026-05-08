@@ -23,6 +23,7 @@ type DiffPanelProps = {
   commentingEnabled: boolean
   comments: CommentWithProjection[]
   onDeleteComment: (id: string) => void
+  onUpdateComment: (id: string, contents: string) => Promise<void> | void
   resolveAnchor: (filePath: string, start: number, end: number | null) => Promise<ResolvedAnchor>
   onSubmitComment?:
     | ((
@@ -45,6 +46,7 @@ export function DiffPanel({
   commentingEnabled,
   comments,
   onDeleteComment,
+  onUpdateComment,
   resolveAnchor,
   onSubmitComment,
   handleRef,
@@ -151,6 +153,7 @@ export function DiffPanel({
             resolveAnchor={resolveAnchor}
             inlineComments={inlineCommentsByFile.get(file.path) ?? EMPTY_INLINE_COMMENTS}
             onDeleteComment={onDeleteComment}
+            onUpdateComment={onUpdateComment}
             onSubmitComment={onSubmitComment}
             scrollLineRef={refForFile(file.path)}
           />

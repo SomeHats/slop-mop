@@ -525,6 +525,27 @@ pub fn delete_comment(db: State<'_, Db>, id: String) -> Result<(), Error> {
     Ok(())
 }
 
+#[tauri::command]
+pub fn update_comment(db: State<'_, Db>, id: String, contents: String) -> Result<Comment, Error> {
+    let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
+    let updated = conn
+        .execute(
+            "UPDATE comments SET contents = ?1 WHERE id = ?2",
+            rusqlite::params![contents, id],
+        )
+        .map_err(|e| Error::Database(e.to_string()))?;
+    if updated == 0 {
+        return Err(Error::InvalidPath(format!("comment {id} not found")));
+    }
+    conn.query_row(
+        "SELECT id, session_id, commit_hash, file_path, range_start, range_end, contents, created_at \
+         FROM comments WHERE id = ?1",
+        rusqlite::params![id],
+        row_to_comment,
+    )
+    .map_err(|e| Error::Database(e.to_string()))
+}
+
 // woke2 impl CMT-PC1, CMT-PC2
 #[tauri::command]
 pub fn project_comments(

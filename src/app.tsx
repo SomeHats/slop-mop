@@ -118,6 +118,11 @@ function ProjectApp({
     [sessionComments.remove],
   )
 
+  const handleUpdateComment = useCallback(
+    (id: string, contents: string): Promise<void> => sessionComments.update(id, contents),
+    [sessionComments.update],
+  )
+
   // woke2 impl APP-SS1, APP-SS2, APP-SS3, APP-SS4, APP-SS5, APP-SS6
   const handleSubmitStaged = useCallback((): void => {
     if (session.isBusy) return // belt-and-braces; the button is also disabled
@@ -280,6 +285,7 @@ function ProjectApp({
                 commentingEnabled={commentingEnabled}
                 comments={sessionComments.comments}
                 onDeleteComment={handleDeleteComment}
+                onUpdateComment={handleUpdateComment}
                 resolveAnchor={handleResolveAnchor}
                 onSubmitComment={handleSubmitComment}
                 handleRef={diffPanelRef}

@@ -23,6 +23,7 @@ export type UseSessionCommentsResult = {
   setAllStaged: (checked: boolean) => void
   add: (comment: Comment) => void
   remove: (id: string) => Promise<void>
+  update: (id: string, contents: string) => Promise<void>
   /** Snapshot the staged + sendable comments, formatted for submission. The
    *  parent (which owns `writeInput`) is responsible for actually sending
    *  them and then calling `remove` on each id. */
@@ -159,6 +160,11 @@ export function useSessionComments(
     })
   }, [])
 
+  const update = useCallback(async (id: string, contents: string): Promise<void> => {
+    const updated = await tauri.updateComment(id, contents)
+    setComments((prev) => prev.map((c) => (c.id === id ? updated : c)))
+  }, [])
+
   // woke2 impl CFE-HK9
   const toggleStaged = useCallback((id: string): void => {
     setStaged((prev) => {
@@ -231,6 +237,7 @@ export function useSessionComments(
     setAllStaged,
     add,
     remove,
+    update,
     prepareSubmit,
     projectionFor,
   }

@@ -64,6 +64,7 @@ pub fn run() {
             comments::create_comment,
             comments::list_comments,
             comments::delete_comment,
+            comments::update_comment,
             comments::project_comments,
             comments::anchor_for_workdir,
         ])

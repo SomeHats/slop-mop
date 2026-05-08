@@ -149,7 +149,10 @@ export function CommentsPanel({
                 )}
               >
                 <div className="flex w-full items-center gap-2">
-                  <span className="truncate text-[10px] text-muted-foreground">
+                  <span
+                    className="truncate text-[10px] text-muted-foreground"
+                    title={displayLocation(comment, projection)}
+                  >
                     {displayLocation(comment, projection)}
                   </span>
                   {orphaned && (
@@ -158,7 +161,9 @@ export function CommentsPanel({
                     </Badge>
                   )}
                 </div>
-                <p className="line-clamp-2 text-xs text-foreground">{comment.contents}</p>
+                <p className="line-clamp-2 text-xs text-foreground" title={comment.contents}>
+                  {comment.contents}
+                </p>
               </button>
               <button
                 type="button"

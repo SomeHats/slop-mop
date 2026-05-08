@@ -114,6 +114,10 @@ export function deleteComment(id: string): Promise<void> {
   return invoke("delete_comment", { id })
 }
 
+export function updateComment(id: string, contents: string): Promise<Comment> {
+  return invoke<Comment>("update_comment", { id, contents })
+}
+
 export function projectComments(
   projectPath: string,
   commentIds: string[],

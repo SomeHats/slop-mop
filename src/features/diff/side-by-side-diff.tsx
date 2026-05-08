@@ -37,6 +37,7 @@ export type SideBySideDiffProps = {
    *  this file and to projections that resolved (not orphaned). */
   inlineComments: InlineComment[]
   onDeleteComment: (id: string) => void
+  onUpdateComment: (id: string, contents: string) => Promise<void> | void
   /** Called when the user submits the composer with a resolved anchor. */
   onSubmitComment?:
     | ((
@@ -103,6 +104,7 @@ function SideBySideDiffInner({
   resolveAnchor,
   inlineComments,
   onDeleteComment,
+  onUpdateComment,
   onSubmitComment,
   scrollLineRef,
 }: SideBySideDiffProps): React.JSX.Element {
@@ -657,7 +659,11 @@ function SideBySideDiffInner({
               className="absolute left-0 right-0 z-[5]"
               style={{ top: `${topPx.toString()}px` }}
             >
-              <InlineCommentCard comment={c} onDelete={() => onDeleteComment(commentId)} />
+              <InlineCommentCard
+                comment={c}
+                onDelete={() => onDeleteComment(commentId)}
+                onUpdate={(contents) => onUpdateComment(commentId, contents)}
+              />
             </div>
           )
         })}
