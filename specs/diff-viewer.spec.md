@@ -38,7 +38,7 @@ Renders the structured diff produced by [diff calculation](diff.spec.md) in a si
 `collapseRows(rows, expansions)` collapses long runs of context.
 
 - !DV-CL1 Identifies maximal runs of consecutive paired-context rows
-- !DV-CL2 Runs of size ≤ `2 * CONTEXT_LINES + 1` (`= 7` with default 3) are emitted as-is
+- !DV-CL2 Runs of size ≤ `baseTop + baseBottom + 1` are emitted as-is — collapsing wouldn't save a row given the available context budget. In the middle (both sides = `CONTEXT_LINES`) this is the classic 7-line threshold; for runs at file edges (one side = 0) it shrinks so trailing tails after a comment-anchor split still collapse instead of leaking the file's actual last lines
 - !DV-CL3 Top base context = 0 when run is at start of file; otherwise `CONTEXT_LINES` (3)
 - !DV-CL4 Bottom base context = 0 when run is at end of file; otherwise `computeSmartBottom(...)`
 - !DV-CL5 Each region's `expansions[regionIndex]` adds `top` and `bottom` reveal counts on top of the base
