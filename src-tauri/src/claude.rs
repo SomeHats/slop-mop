@@ -17,8 +17,8 @@ use tiny_http::{Method, Response, Server};
 use crate::db::Db;
 use crate::error::Error;
 use crate::git::{
-    SUBJECT_TRAILER_KEY, commit_with_session_trailer, derive_branch_prefix,
-    get_head_branch_name, get_head_commit_hash, stage_all_and_check_dirty,
+    commit_with_session_trailer, derive_branch_prefix, get_head_branch_name,
+    get_head_commit_hash, get_head_commit_message, stage_all_and_check_dirty,
 };
 use crate::project::read_project_settings;
 
@@ -402,7 +402,11 @@ struct PromptCommittedEvent {
     agent_id: String,
     session_id: String,
     commit_hash: String,
+    /// First line of the commit (carries any branch prefix as-stored). The
+    /// sidebar strips the current prefix at display.
     prompt: String,
+    /// Full commit message — surfaced as the row's hover-title.
+    message: String,
     timestamp_unix: i64,
 }
 
@@ -603,13 +607,13 @@ fn commit_staged_and_emit(
         }
     };
 
-    // The clean subject for sidebar display; the prefixed form (if any) for
-    // the commit's actual first line, where `git log` and external tools see it.
+    // The commit's first-line subject — possibly carrying a branch prefix.
+    // The sidebar strips the *current* prefix at display time, so old
+    // commits keep whatever prefix they were committed with.
     let unprefixed_subject = first_line(&generated);
-    let prefix = resolve_prefix(app, project_id, path);
-    let display_subject = match &prefix {
+    let display_subject = match resolve_prefix(app, project_id, path) {
         Some(p) => format!("{p}: {unprefixed_subject}"),
-        None => unprefixed_subject.clone(),
+        None => unprefixed_subject,
     };
 
     // Trailing blank line is load-bearing: without it, a single-line
@@ -622,17 +626,7 @@ fn commit_staged_and_emit(
         None => format!("{display_subject}\n\n"),
     };
 
-    // When prefixing, also write the un-prefixed subject as a trailer so the
-    // sidebar can display it cleanly without re-deriving the prefix at
-    // display time. Skip when no prefix applies — keeps clean commits clean.
-    let extras: Vec<(&str, &str)> = if prefix.is_some() {
-        vec![(SUBJECT_TRAILER_KEY, unprefixed_subject.as_str())]
-    } else {
-        vec![]
-    };
-
-    let commit_result =
-        commit_with_session_trailer(path, session_id, &full_message, &extras);
+    let commit_result = commit_with_session_trailer(path, session_id, &full_message, &[]);
     emit_to_window(app, window_label, "commit-finished", status_payload);
     if let Err(e) = commit_result {
         eprintln!("[hook] commit failed: {e}");
@@ -646,6 +640,10 @@ fn commit_staged_and_emit(
             return;
         }
     };
+    // Read the just-committed message back from git so the realtime payload
+    // matches what `list_session_commits` will show on next reload (trailers
+    // included). Falls back to the message we just wrote if the read fails.
+    let message = get_head_commit_message(path).unwrap_or_else(|_| full_message.clone());
     let timestamp_unix = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
@@ -659,8 +657,8 @@ fn commit_staged_and_emit(
             agent_id: agent_id.to_string(),
             session_id: session_id.to_string(),
             commit_hash,
-            // Always the un-prefixed subject — sidebar shows this directly.
-            prompt: unprefixed_subject,
+            prompt: display_subject,
+            message,
             timestamp_unix,
         },
     );

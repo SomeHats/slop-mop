@@ -1,7 +1,9 @@
 import { Loader2, Terminal } from "lucide-react"
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useProjectSettings } from "@/features/projects/use-project-settings"
+import { getHeadBranch } from "@/lib/tauri"
 import type { DiffStats, Selection, SessionCommit } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -11,6 +13,8 @@ type ChatSidebarProps = {
   selection: Selection | null
   onSelect: (sel: Selection | null) => void
   committing: boolean
+  projectId: string
+  projectPath: string
   /** Slot rendered below the prompt history (e.g. CommentsPanel). */
   bottomPanel?: React.ReactNode
 }
@@ -45,8 +49,11 @@ export function ChatSidebar({
   selection,
   onSelect,
   committing,
+  projectId,
+  projectPath,
   bottomPanel,
 }: ChatSidebarProps): React.JSX.Element {
+  const currentPrefix = useCurrentPrefix(projectId, projectPath)
   // Rows: Current Session at the top, then commits in newest-first order
   // (matches `commits` from useClaudeSession).
   const rows: RowMeta[] = useMemo(() => {
@@ -229,8 +236,10 @@ export function ChatSidebar({
                 onClick={handleClick}
                 onDoubleClick={handleDoubleClick}
               >
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                  <span className="line-clamp-2 text-xs text-foreground">{commit.prompt}</span>
+                <div className="flex min-w-0 flex-1 flex-col gap-1" title={commit.message}>
+                  <span className="line-clamp-2 text-xs text-foreground">
+                    {stripPrefix(commit.prompt, currentPrefix)}
+                  </span>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
                       {commit.commit_hash.slice(0, 7)}
@@ -257,6 +266,49 @@ export function ChatSidebar({
       {bottomPanel}
     </div>
   )
+}
+
+/**
+ * Compute the prefix that *new* commits would carry given the current
+ * project setting and current branch. Used to strip prefixes off displayed
+ * subjects. Returns null when no prefix would be applied (mode=none, detached
+ * HEAD, or branch still loading). Loaded once on mount — if the user changes
+ * branch later, old commits keep their as-stored prefix until reload.
+ */
+function useCurrentPrefix(projectId: string, projectPath: string): string | null {
+  const { branchPrefixMode } = useProjectSettings(projectId)
+  const [branch, setBranch] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void getHeadBranch(projectPath).then(
+      (b) => {
+        if (!cancelled) setBranch(b)
+      },
+      () => {
+        if (!cancelled) setBranch(null)
+      },
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [projectPath])
+
+  if (branchPrefixMode === "none" || branch === null) return null
+  if (branchPrefixMode === "full") return branch
+  // "feature": strip up to and including the first `/`. Mirror of the Rust
+  // `derive_branch_prefix` function — kept simple here since the cost of
+  // diverging is just a slightly-stale display.
+  const idx = branch.indexOf("/")
+  if (idx < 0) return branch
+  const after = branch.slice(idx + 1)
+  return after.length > 0 ? after : branch
+}
+
+function stripPrefix(subject: string, prefix: string | null): string {
+  if (prefix === null) return subject
+  const head = `${prefix}: `
+  return subject.startsWith(head) ? subject.slice(head.length) : subject
 }
 
 type RowProps = {

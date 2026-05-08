@@ -6,10 +6,6 @@ use serde::{Deserialize, Serialize};
 use crate::error::Error;
 
 pub const SESSION_TRAILER_KEY: &str = "Slop-Mop-Session-Id";
-/// Trailer carrying the un-prefixed commit subject so the chat sidebar can
-/// show a clean version without re-deriving the prefix at display time.
-/// Only written when a branch prefix is actually applied.
-pub const SUBJECT_TRAILER_KEY: &str = "Slop-Mop-Subject";
 
 #[derive(Default, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -26,6 +22,17 @@ pub fn get_head_commit_hash(path: &Path) -> Result<String, Error> {
     let head = repo.head().map_err(Error::Git)?;
     let commit = head.peel_to_commit().map_err(Error::Git)?;
     Ok(commit.id().to_string())
+}
+
+/// Read the full commit message of HEAD. Used to populate the realtime
+/// `prompt-committed` event so the sidebar's hover-title has the same body
+/// the historical seed gets via `list_session_commits`.
+pub fn get_head_commit_message(path: &Path) -> Result<String, Error> {
+    let repo = git2::Repository::discover(path)
+        .map_err(|_| Error::NotAGitRepo(path.display().to_string()))?;
+    let head = repo.head().map_err(Error::Git)?;
+    let commit = head.peel_to_commit().map_err(Error::Git)?;
+    Ok(commit.message().unwrap_or("").to_string())
 }
 
 /// Resolve the current branch's short name (e.g. `alex/feature`). Returns

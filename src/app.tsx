@@ -204,6 +204,8 @@ function ProjectApp({
           selection={selection}
           onSelect={setSelection}
           committing={session.isCommitting}
+          projectId={projectId}
+          projectPath={projectPath}
           bottomPanel={
             <CommentsPanel
               comments={sessionComments.comments}

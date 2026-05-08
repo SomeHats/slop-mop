@@ -4,14 +4,19 @@ use git2::{Repository, message_trailers_strs};
 use serde::Serialize;
 
 use crate::error::Error;
-use crate::git::{SESSION_TRAILER_KEY, SUBJECT_TRAILER_KEY};
+use crate::git::SESSION_TRAILER_KEY;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SessionCommit {
     pub commit_hash: String,
     pub session_id: String,
-    /// First line of the commit message (the prompt).
+    /// First line of the commit message — possibly carrying a branch prefix
+    /// (e.g. `alex/foo: subject`). The sidebar strips the *current* prefix
+    /// for display; the prefix-as-stored is preserved in `message`.
     pub prompt: String,
+    /// The full commit message, body and trailers included. The sidebar
+    /// surfaces this as the row's hover-title.
+    pub message: String,
     /// Commit time, unix seconds (UTC).
     pub timestamp_unix: i64,
 }
@@ -45,19 +50,13 @@ pub fn list_session_commits(
             continue;
         }
 
-        // Prefer the un-prefixed subject trailer (written when a branch
-        // prefix was applied) so the sidebar shows the clean subject. Fall
-        // back to the commit's first line for commits without the trailer.
-        let subject = trailers
-            .iter()
-            .find(|(k, _)| *k == SUBJECT_TRAILER_KEY)
-            .map(|(_, v)| v.to_string())
-            .unwrap_or_else(|| message.lines().next().unwrap_or("").to_string());
+        let subject = message.lines().next().unwrap_or("").to_string();
 
         out.push(SessionCommit {
             commit_hash: oid.to_string(),
             session_id: session_id.clone(),
             prompt: subject,
+            message: message.to_string(),
             timestamp_unix: commit.time().seconds(),
         });
     }
@@ -93,27 +92,19 @@ mod tests {
     }
 
     #[test]
-    fn list_session_commits_prefers_subject_trailer_when_present() {
+    fn list_session_commits_returns_subject_and_full_message() {
         let dir = TempDir::new().unwrap();
         let repo = Repository::init(dir.path()).unwrap();
 
-        // Older: no subject trailer, sidebar should fall back to the first line.
-        make_commit(
-            &repo,
-            "a.txt",
-            "a",
-            "subject A\n\nbody\n\nSlop-Mop-Session-Id: sess1\n",
-        );
+        let msg_a = "subject A\n\nbody A\n\nSlop-Mop-Session-Id: sess1\n";
+        make_commit(&repo, "a.txt", "a", msg_a);
 
-        // Newer: prefixed subject in first line, un-prefixed value in trailer.
-        make_commit(
-            &repo,
-            "b.txt",
-            "b",
-            "alex/foo: subject B\n\nbody\n\nSlop-Mop-Session-Id: sess1\nSlop-Mop-Subject: subject B\n",
-        );
+        // A prefixed commit — the prefix stays in the prompt; runtime stripping
+        // happens on the frontend.
+        let msg_b = "alex/foo: subject B\n\nbody B\n\nSlop-Mop-Session-Id: sess1\n";
+        make_commit(&repo, "b.txt", "b", msg_b);
 
-        // A commit on a different session — should be filtered out entirely.
+        // Other-session commit, filtered out.
         make_commit(
             &repo,
             "c.txt",
@@ -127,12 +118,11 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(out.len(), 2, "should only include sess1 commits");
+        assert_eq!(out.len(), 2);
         // Newest first.
-        assert_eq!(out[0].prompt, "subject B", "trailer wins over first line");
-        assert_eq!(
-            out[1].prompt, "subject A",
-            "no trailer → falls back to first line",
-        );
+        assert_eq!(out[0].prompt, "alex/foo: subject B");
+        assert_eq!(out[0].message, msg_b);
+        assert_eq!(out[1].prompt, "subject A");
+        assert_eq!(out[1].message, msg_a);
     }
 }

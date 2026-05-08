@@ -20,8 +20,11 @@ declare global {
 export type SessionCommit = {
   commit_hash: string
   session_id: string
-  /** First line of the commit message (the prompt). */
+  /** First line of the commit message — may include a branch prefix. The
+   *  sidebar strips the *current* prefix at display time. */
   prompt: string
+  /** Full commit message, body and trailers included. Used for hover-title. */
+  message: string
   /** Commit time, unix seconds (UTC). */
   timestamp_unix: number
 }

@@ -145,6 +145,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
           session_id: string
           commit_hash: string
           prompt: string
+          message: string
           timestamp_unix: number
         }>("prompt-committed", (evt) => {
           if (evt.payload.agent_id !== agentIdRef.current) return
@@ -153,6 +154,7 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
             commit_hash: evt.payload.commit_hash,
             session_id: evt.payload.session_id,
             prompt: evt.payload.prompt,
+            message: evt.payload.message,
             timestamp_unix: evt.payload.timestamp_unix,
           }
           // git2 walks newest-first from HEAD, so prepend.
