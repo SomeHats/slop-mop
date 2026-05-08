@@ -59,6 +59,7 @@ pub fn run() {
             window::open_project_window,
             diff::batch_diff_stats,
             diff::get_range_diff,
+            diff::get_file_lines,
             watcher::start_watching,
             watcher::stop_watching,
             comments::create_comment,

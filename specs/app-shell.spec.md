@@ -24,6 +24,7 @@ description: Top-level App component — picks between picker and project view, 
 - !APP-CM2 Successful workdir anchoring returns the resolved `(commit_hash, line_start, line_end)`; "uncommittable" returns `{ ok: false }`
 - !APP-CM3 `handleSubmitComment` writes the comment via `tauri.createComment` and adds it to the session list
 - !APP-CM4 No-op submit when no `sessionId` (defensive against early submission)
+- !APP-CO1 Merges synthesised comment-only file diffs after the real ones so files containing non-orphaned comments always appear in the diff view, even when unchanged in the active range
 
 ## Submit staged comments to agent
 

@@ -118,6 +118,14 @@ export function updateComment(id: string, contents: string): Promise<Comment> {
   return invoke<Comment>("update_comment", { id, contents })
 }
 
+export function getFileLines(
+  projectPath: string,
+  filePath: string,
+  targetCommit: string | null,
+): Promise<string[] | null> {
+  return invoke<string[] | null>("get_file_lines", { projectPath, filePath, targetCommit })
+}
+
 export function projectComments(
   projectPath: string,
   commentIds: string[],

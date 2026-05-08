@@ -28,6 +28,8 @@ export type HighlightedRow =
       stickyLines: HighlightedStickyLine[]
     }
 
+const EMPTY_LINE_SET: ReadonlySet<number> = new Set()
+
 /**
  * Reconstruct the old- and new-side full-file line lists from the unfiltered
  * row list. Highlighter input must include hidden context lines so token
@@ -52,9 +54,13 @@ export function reconstructOldNewLines(rows: SideBySideRow[]): {
 export function useHighlightedDiff(
   fileDiff: FileDiff,
   expansions: Map<number, RegionExpansion>,
+  mustShowRightLines: ReadonlySet<number> = EMPTY_LINE_SET,
 ): { rows: HighlightedRow[]; isHighlighting: boolean } {
   const allRows = useMemo(() => computeRows(fileDiff.hunks), [fileDiff.hunks])
-  const visibleRows = useMemo(() => collapseRows(allRows, expansions), [allRows, expansions])
+  const visibleRows = useMemo(
+    () => collapseRows(allRows, expansions, mustShowRightLines),
+    [allRows, expansions, mustShowRightLines],
+  )
 
   // Reconstruct old and new full text from all rows (not just visible) so the
   // highlighter sees full surrounding context — collapsed regions still

@@ -210,6 +210,9 @@ export function computeSmartBottom(
 export function collapseRows(
   rows: SideBySideRow[],
   expansions: Map<number, RegionExpansion>,
+  /** Right-side line numbers that must remain visible (e.g. comment anchors).
+   *  Treated as run-breakers so they're never inside a collapsed region. */
+  mustShowRightLines: ReadonlySet<number> = new Set(),
 ): SideBySideRow[] {
   // Identify runs of consecutive context rows
   type Run = { start: number; length: number }
@@ -219,8 +222,14 @@ export function collapseRows(
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
-    const isContext =
+    const isPlainContext =
       row?.kind === "paired" && row.left?.type === "context" && row.right?.type === "context"
+    // woke2 impl DV-CL9
+    const isAnchor =
+      isPlainContext &&
+      row.right != null &&
+      mustShowRightLines.has(row.right.lineNo)
+    const isContext = isPlainContext && !isAnchor
 
     if (isContext) {
       if (runStart === -1) {

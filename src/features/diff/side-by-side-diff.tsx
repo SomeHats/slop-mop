@@ -152,7 +152,14 @@ function SideBySideDiffInner({
     [],
   )
 
-  const { rows } = useHighlightedDiff(file, expansions)
+  // woke2 impl DV-CL10
+  const mustShowRightLines = useMemo(() => {
+    const set = new Set<number>()
+    for (const ic of inlineComments) set.add(ic.anchorLine)
+    return set
+  }, [inlineComments])
+
+  const { rows } = useHighlightedDiff(file, expansions, mustShowRightLines)
 
   // Re-measure row pixel height on font-size changes (rare, but cheap).
   useEffect(() => {

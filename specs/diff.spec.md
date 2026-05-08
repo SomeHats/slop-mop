@@ -34,3 +34,12 @@ The Rust backend produces structured diffs that the frontend renders. See [comme
 - !DIF-L2 Only origins `+`, `-`, and ` ` (context) populate hunk lines; other origin chars (header lines etc.) are skipped
 - !DIF-L3 Per-file `additions`/`deletions` are counted from `+` and `-` origins as the diff is walked
 - !DIF-L4 Unrecognised `Delta` variants log a warning and map to `"unknown"` status
+
+## File-content reads
+
+`get_file_lines(file_path, target_commit)` returns the lines of a file at a given target so the frontend can synthesise FileDiff entries for files that hold non-orphaned comments but didn't change in the active diff.
+
+- !DIF-FL1 `target_commit = Some(hash)` reads the blob from that commit's tree
+- !DIF-FL2 `target_commit = None` reads from the workdir (filesystem path under `project_path`)
+- !DIF-FL3 Returns `Ok(None)` when the file doesn't exist at the target (missing blob entry, missing workdir file, or non-utf8 content) — never raises
+- !DIF-FL4 Errors with `NotAGitRepo` when `project_path` isn't inside a git repo

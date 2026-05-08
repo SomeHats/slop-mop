@@ -45,6 +45,8 @@ Renders the structured diff produced by [diff calculation](diff.spec.md) in a si
 - !DV-CL6 When the total visible covers the whole run, it's fully revealed (no collapse marker emitted)
 - !DV-CL7 Otherwise emits the top context, a `collapsed` row carrying the hidden count + sticky lines, then the bottom context
 - !DV-CL8 Chevron clicks call `handleExpandTop`/`handleExpandBottom` which add `EXPAND_STEP` (20) to the relevant counter
+- !DV-CL9 `mustShowRightLines` (right-side line numbers, e.g. comment anchors) are excluded from context-run detection so they're never folded into a collapsed region; the row itself still renders inline as a paired-context row
+- !DV-CL10 `SideBySideDiff` derives `mustShowRightLines` from `inlineComments.anchorLine`, so committed comments split surrounding context runs into shorter ones with their own collapse bars
 
 ## Syntax highlighting
 
@@ -94,3 +96,13 @@ Renders the structured diff produced by [diff calculation](diff.spec.md) in a si
 - !DV-IC5 Save is blocked when the trimmed draft is empty; an unchanged draft exits edit mode without calling `onUpdate`
 - !DV-IC6 `Esc` cancels (restores the original contents and exits edit mode); `Cmd/Ctrl + Enter` saves
 - !DV-IC7 Successful save calls `onUpdate(trimmedContents)` and exits edit mode
+
+## Comment-only file diffs
+
+`useCommentOnlyFileDiffs` synthesises FileDiff entries for files that hold non-orphaned comments but didn't change in the active diff range, so commented files always appear in the viewer.
+
+- !DV-CO1 Iterates `comments` and includes only those whose diff-view projection is `located`; orphans never trigger synthesis
+- !DV-CO2 Skips paths that already appear in the real `fileDiffs` (rename-aware: uses the projected path when present)
+- !DV-CO3 Re-runs only when the missing path set or `selection.newer` target changes (stable string key) — unrelated state churn doesn't refetch
+- !DV-CO4 Each missing path is fetched in parallel via `getFileLines(projectPath, path, selection.newer ?? null)`; failures and missing files are silently dropped
+- !DV-CO5 Synthesised FileDiff has `status: "unchanged"`, no rename/old_path, `additions = deletions = 0`, and a single hunk where every line is origin ` ` with `old_line_no === new_line_no`

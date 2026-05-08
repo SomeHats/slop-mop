@@ -113,6 +113,10 @@ Diff command surface (diff.rs):
 - !DIF-L1 — strip trailing newlines: integration
 - !DIF-L2 — only +/-/space origins: integration
 - !DIF-L3 — additions/deletions tally: covered by DIF-S1
+- !DIF-FL1 — get_file_lines from commit tree: needs writable repo
+- !DIF-FL2 — get_file_lines from workdir: needs writable repo
+- !DIF-FL3 — missing/non-utf8 returns Ok(None): needs writable repo
+- !DIF-FL4 — NotAGitRepo error: covered by DIF-S5
 
 Commands that need Tauri state (commits.rs, comments.rs, project.rs, watcher.rs, db.rs, menu.rs, window.rs, lib.rs):
 
@@ -204,6 +208,7 @@ App shell (app.tsx):
 - !APP-CM2 — uncommittable returns ok:false: needs Tauri IPC mock
 - !APP-CM3 — handleSubmitComment writes: needs Tauri IPC mock
 - !APP-CM4 — no-op without sessionId: needs Tauri IPC mock
+- !APP-CO1 — merges synthesised comment-only file diffs: needs Tauri IPC mock
 - !APP-SS1 — busy guard: integration
 - !APP-SS2 — prepareSubmit dispatch: integration
 - !APP-SS3 — Ctrl-S clear: integration
@@ -293,6 +298,8 @@ Diff viewer rendering and click+drag (compute-diff-rows.ts pure functions are te
 - !DV-CL6 — full reveal omits collapse marker
 - !DV-CL7 — collapsed marker emission
 - !DV-CL8 — EXPAND_STEP constant
+- !DV-CL9 — must-show breaks runs (pure but composes with already-untestable run logic)
+- !DV-CL10 — SideBySideDiff derives must-show: DOM rendering
 - !DV-SB2 — smart-bottom indent boundary
 - !DV-HL2 — language resolution from path
 - !DV-HL3 — cancellation flag
@@ -319,6 +326,11 @@ Diff viewer rendering and click+drag (compute-diff-rows.ts pure functions are te
 - !DV-IC5 — empty/unchanged save guard
 - !DV-IC6 — Esc cancel / Cmd+Enter save
 - !DV-IC7 — onUpdate on save
+- !DV-CO1 — only located comments trigger synthesis: needs Tauri IPC mock
+- !DV-CO2 — skips paths in real fileDiffs: needs Tauri IPC mock
+- !DV-CO3 — stable refetch key: needs Tauri IPC mock
+- !DV-CO4 — parallel fetch + silent failure handling: needs Tauri IPC mock
+- !DV-CO5 — synthesised FileDiff shape: covered indirectly via DV-CO4 integration
 
 Project picker / settings UI:
 

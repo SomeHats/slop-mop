@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { ChatSidebar } from "./features/chat/chat-sidebar"
@@ -12,6 +12,7 @@ import { ProjectSettingsButton } from "./features/projects/project-settings-butt
 import { useProjectSettings } from "./features/projects/use-project-settings"
 import { TerminalPanel } from "./features/terminal/terminal-panel"
 import { useClaudeSession } from "./hooks/use-claude-session"
+import { useCommentOnlyFileDiffs } from "./hooks/use-comment-only-file-diffs"
 import { useDiffStats } from "./hooks/use-diff-stats"
 import { useFullscreen } from "./hooks/use-fullscreen"
 import { useRangeDiff } from "./hooks/use-range-diff"
@@ -81,9 +82,27 @@ function ProjectApp({
   }, [session.onCommitLanded])
 
   const diffStats = useDiffStats(projectPath, session.commits)
-  const { fileDiffs, isLoading: isDiffLoading } = useRangeDiff(projectPath, selection)
+  const { fileDiffs: realFileDiffs, isLoading: isDiffLoading } = useRangeDiff(
+    projectPath,
+    selection,
+  )
 
   const sessionComments = useSessionComments(projectPath, session.sessionId, selection)
+
+  // Files that have non-orphaned comments but didn't change in the active diff
+  // get synthesised "unchanged" entries so the user can still see (and click)
+  // those comments.
+  // woke2 impl APP-CO1
+  const commentOnlyFileDiffs = useCommentOnlyFileDiffs(
+    projectPath,
+    selection,
+    sessionComments.comments,
+    realFileDiffs,
+  )
+  const fileDiffs = useMemo(
+    () => [...realFileDiffs, ...commentOnlyFileDiffs],
+    [realFileDiffs, commentOnlyFileDiffs],
+  )
   const diffPanelRef = useRef<DiffPanelHandle | null>(null)
 
   // Resolve a clicked workdir range to a real (commit_hash, line_start, line_end)

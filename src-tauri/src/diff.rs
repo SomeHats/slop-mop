@@ -259,6 +259,57 @@ pub fn get_range_diff(
     Ok(file_diffs)
 }
 
+/// Read the full text of `file_path` at `target_commit` (or the workdir when
+/// `None`) and return one line per `Vec<String>` entry. Returns `Ok(None)` if
+/// the file does not exist at the requested target.
+///
+/// Used by the frontend to synthesise an "unchanged" FileDiff for files that
+/// hold non-orphaned comments but didn't change in the active diff range, so
+/// commented lines stay visible.
+// woke2 impl DIF-FL4
+#[tauri::command]
+pub fn get_file_lines(
+    project_path: String,
+    file_path: String,
+    target_commit: Option<String>,
+) -> Result<Option<Vec<String>>, Error> {
+    let repo = Repository::discover(Path::new(&project_path))
+        .map_err(|_| Error::NotAGitRepo(project_path.clone()))?;
+
+    let text: Option<String> = match target_commit {
+        // woke2 impl DIF-FL1
+        Some(hash) => {
+            let tree = commit_tree(&repo, &hash)?;
+            match tree.get_path(Path::new(&file_path)) {
+                Ok(entry) => {
+                    let blob = repo.find_blob(entry.id()).map_err(Error::Git)?;
+                    match std::str::from_utf8(blob.content()) {
+                        Ok(s) => Some(s.to_string()),
+                        // woke2 impl DIF-FL3
+                        Err(_) => return Ok(None), // binary/non-utf8 file
+                    }
+                }
+                Err(_) => None,
+            }
+        }
+        // woke2 impl DIF-FL2
+        None => {
+            let abs = Path::new(&project_path).join(&file_path);
+            match std::fs::read_to_string(&abs) {
+                Ok(s) => Some(s),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                Err(_) => return Ok(None),
+            }
+        }
+    };
+
+    Ok(text.map(|s| {
+        // `lines()` swallows the trailing newline if any — fine, since we
+        // render hunks line by line anyway.
+        s.lines().map(|l| l.to_string()).collect()
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
