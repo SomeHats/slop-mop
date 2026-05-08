@@ -120,7 +120,7 @@ export function CommentsPanel({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {comments.map(({ comment, projection, sessionProjection }) => {
-          // woke2 impl CFE-PN6, CFE-PN8, CFE-PN9, CFE-PN10
+          // woke2 impl CFE-PN6, CFE-PN8, CFE-PN9, CFE-PN10, CFE-PN12, CFE-PN13
           const orphaned = isOrphaned(projection)
           const sendable = sessionProjection?.kind === "located"
           const checkboxTitle = sendable ? undefined : reasonText(sessionProjection)

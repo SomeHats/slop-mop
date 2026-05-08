@@ -19,6 +19,7 @@ Comments anchor to `(commit_hash, file_path, range_start, range_end)`. As Claude
 - !CMT-CR1 `create_comment` validates the range against the same rules the schema enforces and returns the freshly-inserted row
 - !CMT-CR2 `list_comments` returns rows for one `session_id` ordered by `created_at DESC`
 - !CMT-CR3 `delete_comment` removes a single comment by id
+- !CMT-CR4 `update_comment` overwrites `contents` for one id and returns the updated row; missing ids return `InvalidPath`
 
 ## Projection (pure)
 

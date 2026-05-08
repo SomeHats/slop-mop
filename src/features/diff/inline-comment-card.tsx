@@ -24,10 +24,12 @@ export function InlineCommentCard({
   const [draft, setDraft] = useState(comment.contents)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // woke2 impl DV-IC4
   useEffect(() => {
     if (editing) textareaRef.current?.focus()
   }, [editing])
 
+  // woke2 impl DV-IC3
   const beginEdit = (): void => {
     setDraft(comment.contents)
     setEditing(true)
@@ -40,10 +42,12 @@ export function InlineCommentCard({
 
   const save = async (): Promise<void> => {
     const trimmed = draft.trim()
+    // woke2 impl DV-IC5
     if (!trimmed || trimmed === comment.contents) {
       setEditing(false)
       return
     }
+    // woke2 impl DV-IC7
     await onUpdate(trimmed)
     setEditing(false)
   }
@@ -62,6 +66,7 @@ export function InlineCommentCard({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
+            // woke2 impl DV-IC6
             if (e.key === "Escape") {
               e.preventDefault()
               cancel()

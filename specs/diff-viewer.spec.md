@@ -89,3 +89,8 @@ Renders the structured diff produced by [diff calculation](diff.spec.md) in a si
 
 - !DV-IC1 Shows the comment body with whitespace preserved (`whitespace-pre-wrap`, `break-words`)
 - !DV-IC2 Trash icon is hidden until row hover (group-hover); clicking calls `onDelete`
+- !DV-IC3 Pencil icon (sibling of trash, also hover-revealed) toggles the card into an edit mode with a textarea seeded from the current contents
+- !DV-IC4 Edit-mode textarea auto-focuses on entry
+- !DV-IC5 Save is blocked when the trimmed draft is empty; an unchanged draft exits edit mode without calling `onUpdate`
+- !DV-IC6 `Esc` cancels (restores the original contents and exits edit mode); `Cmd/Ctrl + Enter` saves
+- !DV-IC7 Successful save calls `onUpdate(trimmedContents)` and exits edit mode

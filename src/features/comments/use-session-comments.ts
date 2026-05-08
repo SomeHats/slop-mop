@@ -160,6 +160,7 @@ export function useSessionComments(
     })
   }, [])
 
+  // woke2 impl CFE-HK13
   const update = useCallback(async (id: string, contents: string): Promise<void> => {
     const updated = await tauri.updateComment(id, contents)
     setComments((prev) => prev.map((c) => (c.id === id ? updated : c)))

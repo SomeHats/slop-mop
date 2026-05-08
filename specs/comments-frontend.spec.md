@@ -43,6 +43,7 @@ The UI half of the comment system. The Rust backend owns [storage and projection
 - !CFE-HK6 Both projection effects use a request-sequence ref to drop stale responses
 - !CFE-HK7 `add` prepends a new comment and auto-stages it when `shouldAutoStageNew` returns true
 - !CFE-HK8 `remove` calls `tauri.deleteComment`, removes the comment, and unstages it
+- !CFE-HK13 `update` calls `tauri.updateComment` and replaces the in-memory comment with the returned row
 - !CFE-HK9 `toggleStaged` flips a single id's membership in the staged set
 - !CFE-HK10 `setAllStaged(true)` stages every sendable comment; `setAllStaged(false)` clears the set
 - !CFE-HK11 `prepareSubmit` snapshots the staged + sendable comments, sorted by `created_at` (oldest first) so the agent reads them in the order written
@@ -69,3 +70,5 @@ The UI half of the comment system. The Rust backend owns [storage and projection
 - !CFE-PN9 Clicking the row body calls `onJump(commentId)` so the parent can scroll/select to the comment's location
 - !CFE-PN10 Trash icon is hidden until row hover; clicking calls `onDelete(commentId)`
 - !CFE-PN11 Panel uses CSS `contain: layout style` so checkbox flips don't invalidate the sibling diff panel's layout
+- !CFE-PN12 Truncated location text exposes the full string via the `title` attribute so it's recoverable on hover
+- !CFE-PN13 Line-clamped contents expose the full body via the `title` attribute so it's recoverable on hover

@@ -525,6 +525,7 @@ pub fn delete_comment(db: State<'_, Db>, id: String) -> Result<(), Error> {
     Ok(())
 }
 
+// woke2 impl CMT-CR4
 #[tauri::command]
 pub fn update_comment(db: State<'_, Db>, id: String, contents: String) -> Result<Comment, Error> {
     let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;

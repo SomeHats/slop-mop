@@ -126,6 +126,7 @@ Commands that need Tauri state (commits.rs, comments.rs, project.rs, watcher.rs,
 - !CMT-CR1 — create_comment validation: covered transitively by CMT-DB2/DB3
 - !CMT-CR2 — list_comments query: trivial SELECT
 - !CMT-CR3 — delete_comment query: trivial DELETE
+- !CMT-CR4 — update_comment query: trivial UPDATE
 - !CMT-FC1 — diff opts: covered transitively by integration tests
 - !CMT-FC4 — Unchanged when file absent from diff: integration with non-existent file
 - !CMT-PC1 — project_comments command: needs Tauri state + DB
@@ -253,6 +254,7 @@ Comments UI (composer + panel) — DOM rendering + interaction:
 - !CFE-HK6 — request-seq drop stale
 - !CFE-HK7 — add prepends + auto-stages
 - !CFE-HK8 — remove deletes + unstages
+- !CFE-HK13 — update replaces in-memory comment
 - !CFE-HK9 — toggleStaged
 - !CFE-HK10 — setAllStaged
 - !CFE-HK11 — prepareSubmit ordering
@@ -273,6 +275,8 @@ Comments UI (composer + panel) — DOM rendering + interaction:
 - !CFE-PN9 — onJump
 - !CFE-PN10 — onDelete
 - !CFE-PN11 — layout containment
+- !CFE-PN12 — title attribute on truncated location
+- !CFE-PN13 — title attribute on line-clamped contents
 
 Diff viewer rendering and click+drag (compute-diff-rows.ts pure functions are tested separately):
 
@@ -310,6 +314,11 @@ Diff viewer rendering and click+drag (compute-diff-rows.ts pure functions are te
 - !DV-CC7 — heights map pruning
 - !DV-IC1 — preserved whitespace
 - !DV-IC2 — hover-revealed delete
+- !DV-IC3 — pencil toggles edit mode
+- !DV-IC4 — edit textarea auto-focus
+- !DV-IC5 — empty/unchanged save guard
+- !DV-IC6 — Esc cancel / Cmd+Enter save
+- !DV-IC7 — onUpdate on save
 
 Project picker / settings UI:
 
