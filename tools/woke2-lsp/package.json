@@ -1,6 +1,7 @@
 {
   "name": "woke2-lsp",
   "displayName": "woke2",
+  "type": "commonjs",
   "version": "0.1.0",
   "description": "Language support for woke2 behavior specs — hover, go-to-definition, find-references, diagnostics, and completions for behavior IDs.",
   "categories": [
