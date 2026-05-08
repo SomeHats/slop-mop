@@ -44,6 +44,6 @@ The hook that subscribes to every backend event from [auto-commit hooks](claude.
 
 When Claude reports a new session id while one is already active (`/clear`, `/compact`, etc.), the hook defers the decision to the user instead of silently switching. See [new-session dialog](new-session-dialog.spec.md) for the UI half.
 
-- !UCS-AL1 If `session-started` fires with `session_id !== sessionIdRef.current` and the current id is non-null, sets `pendingNewSession` to `{ newSessionId, source }` and does *not* touch `sessionId` / `commits`
-- !UCS-AL2 `acceptNewSession()` switches the primary to the pending Claude id, clears commits, and re-seeds via `listSessionCommits`
+- !UCS-AL1 `session-started` always resolves the incoming Claude id via `listSessionCommits` (which returns the slop-mop primary). When the current `sessionId` is non-null and the resolved primary differs, sets `pendingNewSession` to `{ newSessionId, newPrimary, source }` and does *not* touch `sessionId` / `commits`. Otherwise anchors `sessionId` on the resolved primary (so resuming an aliased Claude session lands on the original)
+- !UCS-AL2 `acceptNewSession()` switches `sessionId` to `pending.newPrimary` (already resolved at detection time, so any prior alias chain the new id was part of is preserved), clears commits, and re-seeds via `listSessionCommits`
 - !UCS-AL3 `aliasNewSession()` records the pending id under the current primary via `tauri.addSessionAlias`, then refetches commits using the (unchanged) primary so commits already authored under the new id surface in the sidebar

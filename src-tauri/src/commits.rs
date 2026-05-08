@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use git2::{Repository, message_trailers_strs};
+use rusqlite::OptionalExtension;
 use serde::Serialize;
 use tauri::State;
 
@@ -32,6 +33,10 @@ pub struct SessionCommitsResult {
     /// matching prefixes off displayed subjects. `None` when no prefix
     /// applies (mode=`none`, detached HEAD, or settings unreadable).
     pub current_prefix: Option<String>,
+    /// The slop-mop session id this list belongs to — i.e. the primary the
+    /// caller's input Claude session id resolves to via `session_aliases`.
+    /// Equal to the input when the input is itself a primary (no row).
+    pub primary_session_id: String,
 }
 
 /// Walk `git log` from HEAD and pull out commits carrying any of the given
@@ -83,6 +88,23 @@ fn walk_session_commits(
     Ok(out)
 }
 
+/// Resolve any Claude session id to its slop-mop primary. Returns the input
+/// unchanged when the id has no row in `session_aliases` — primaries don't
+/// store self-rows.
+// woke2 impl SCM-AL4
+fn resolve_primary_session_id(db: &Db, claude_session_id: &str) -> Result<String, Error> {
+    let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
+    let primary: Option<String> = conn
+        .query_row(
+            "SELECT primary_session_id FROM session_aliases WHERE claude_session_id = ?1",
+            rusqlite::params![claude_session_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| Error::Database(e.to_string()))?;
+    Ok(primary.unwrap_or_else(|| claude_session_id.to_string()))
+}
+
 /// Return every claude session id known to belong to a given primary
 /// slop-mop session — the primary id itself plus any aliases recorded in the
 /// `session_aliases` table.
@@ -109,7 +131,7 @@ fn expand_session_ids(db: &Db, primary_session_id: &str) -> Result<Vec<String>, 
     Ok(ids)
 }
 
-// woke2 impl SCM-P1, SCM-P2
+// woke2 impl SCM-P1, SCM-P2, SCM-AL5
 #[tauri::command]
 pub fn list_session_commits(
     db: State<'_, Db>,
@@ -117,12 +139,17 @@ pub fn list_session_commits(
     project_path: String,
     session_id: String,
 ) -> Result<SessionCommitsResult, Error> {
-    let claude_ids = expand_session_ids(&db, &session_id)?;
-    let commits = walk_session_commits(&project_path, &session_id, &claude_ids)?;
+    // Input may be either a primary or any aliased Claude id (e.g. the user
+    // resumed an aliased session at startup); always anchor on the resolved
+    // primary so the alias chain stays intact across restarts.
+    let primary = resolve_primary_session_id(&db, &session_id)?;
+    let claude_ids = expand_session_ids(&db, &primary)?;
+    let commits = walk_session_commits(&project_path, &primary, &claude_ids)?;
     let prefix = current_prefix(&db, &project_id, Path::new(&project_path));
     Ok(SessionCommitsResult {
         commits,
         current_prefix: prefix,
+        primary_session_id: primary,
     })
 }
 
@@ -267,6 +294,30 @@ mod tests {
         // matched.
         assert_eq!(out[0].session_id, "original");
         assert_eq!(out[1].session_id, "original");
+    }
+
+    // woke2 test SCM-AL4
+    #[test]
+    fn resolve_primary_session_id_follows_alias() {
+        let db = Db::open_in_memory().unwrap();
+        // Unaliased id resolves to itself.
+        assert_eq!(
+            resolve_primary_session_id(&db, "loner").unwrap(),
+            "loner".to_string()
+        );
+
+        add_session_alias_inner(&db, "after-clear", "original").unwrap();
+
+        // Aliased id resolves to its primary.
+        assert_eq!(
+            resolve_primary_session_id(&db, "after-clear").unwrap(),
+            "original".to_string()
+        );
+        // The primary itself isn't in the table — it still resolves to itself.
+        assert_eq!(
+            resolve_primary_session_id(&db, "original").unwrap(),
+            "original".to_string()
+        );
     }
 
     // woke2 test SCM-AL2, SCM-AL3

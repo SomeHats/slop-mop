@@ -18,6 +18,10 @@ export type SessionStartSource = "startup" | "resume" | "clear" | "compact" | (s
  *  existing one. */
 export type PendingNewSession = {
   newSessionId: string
+  /** Primary the new Claude id already resolves to (or itself when no row
+   *  in `session_aliases`). Used as the new `sessionId` when the user
+   *  picks "start a new task". */
+  newPrimary: string
   source: SessionStartSource
 }
 
@@ -140,31 +144,33 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
         }>("session-started", (evt) => {
           if (evt.payload.agent_id !== agentIdRef.current) return
           console.log("[slop-mop] session-started", evt.payload)
-          // Mid-flow new session id (e.g. /clear, /compact, /resume from
-          // inside Claude): defer the decision to the user. Don't touch
-          // sessionId / commits yet — the dialog handler will do that.
-          // woke2 impl UCS-AL1
-          if (
-            sessionIdRef.current !== null &&
-            evt.payload.session_id !== sessionIdRef.current
-          ) {
-            setPendingNewSession({
-              newSessionId: evt.payload.session_id,
-              source: evt.payload.source,
-            })
-            return
-          }
-          setSessionId(evt.payload.session_id)
-          setSessionSource(evt.payload.source)
-          // Seed history from git log for this session, and capture the
-          // current branch prefix so the sidebar can strip it from displayed
-          // subjects without re-deriving it client-side.
+          // Always go through `listSessionCommits`: the backend resolves the
+          // incoming Claude id to its slop-mop primary (so resuming an
+          // already-aliased session lands on the original primary instead
+          // of orphaning it as a new session). The `primary_session_id` in
+          // the response is what we anchor `sessionId` on.
           void listSessionCommits(_projectId, projectPath, evt.payload.session_id).then(
             (loaded) => {
-              if (!cancelled && agentIdRef.current === evt.payload.agent_id) {
-                setCommits(loaded.commits)
-                setCurrentPrefix(loaded.current_prefix)
+              if (cancelled || agentIdRef.current !== evt.payload.agent_id) return
+              // Mid-flow primary change (e.g. /clear, /compact issuing a
+              // genuinely new id): defer the decision to the user. Don't
+              // touch sessionId / commits yet — the dialog handler will.
+              // woke2 impl UCS-AL1
+              if (
+                sessionIdRef.current !== null &&
+                loaded.primary_session_id !== sessionIdRef.current
+              ) {
+                setPendingNewSession({
+                  newSessionId: evt.payload.session_id,
+                  newPrimary: loaded.primary_session_id,
+                  source: evt.payload.source,
+                })
+                return
               }
+              setSessionId(loaded.primary_session_id)
+              setSessionSource(evt.payload.source)
+              setCommits(loaded.commits)
+              setCurrentPrefix(loaded.current_prefix)
             },
             (e) => console.error("[slop-mop] listSessionCommits failed", e),
           )
@@ -291,11 +297,13 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
     setPendingNewSession((pending) => {
       if (!pending) return null
       const aid = agentIdRef.current
-      setSessionId(pending.newSessionId)
+      // Anchor on the resolved primary, not the raw Claude id — preserves
+      // any prior alias chain the new id was already part of.
+      setSessionId(pending.newPrimary)
       setSessionSource(pending.source)
       setCommits([])
       setCurrentPrefix(null)
-      void listSessionCommits(_projectId, projectPath, pending.newSessionId).then(
+      void listSessionCommits(_projectId, projectPath, pending.newPrimary).then(
         (loaded) => {
           if (agentIdRef.current !== aid) return
           setCommits(loaded.commits)

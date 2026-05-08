@@ -57,21 +57,13 @@ export function NewSessionDialog({
             review history so far?
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-2">
-          <Button type="button" onClick={onAlias}>
-            Same task, fresh context
+        <div className="flex gap-2 px-4 py-3">
+          <Button type="button" variant="outline" className="flex-1" onClick={onAccept}>
+            Clear
           </Button>
-          <p className="px-1 text-[11px] text-muted-foreground">
-            Keep the current review session and treat the new Claude session as part of it.
-            Comments and history stay.
-          </p>
-          <Button type="button" variant="outline" onClick={onAccept}>
-            Start a new task
+          <Button type="button" className="flex-1" onClick={onAlias}>
+            Keep history
           </Button>
-          <p className="px-1 text-[11px] text-muted-foreground">
-            Begin a fresh slop-mop session. The history pane will reflect only commits made under
-            the new Claude session.
-          </p>
         </div>
       </DialogContent>
     </Dialog>

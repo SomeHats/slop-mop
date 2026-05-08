@@ -34,6 +34,10 @@ export type SessionCommitsResult = {
   /** Prefix that new commits would carry given current settings + branch.
    *  Used to strip matching prefixes off displayed subjects. */
   current_prefix: string | null
+  /** Slop-mop session id this list belongs to — i.e. the primary the
+   *  caller's input Claude session id resolves to via `session_aliases`.
+   *  Equal to the input when the input is itself a primary. */
+  primary_session_id: string
 }
 
 /**

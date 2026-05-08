@@ -165,6 +165,7 @@ Commands that need Tauri state (commits.rs, comments.rs, project.rs, watcher.rs,
 - !DB-SC3 — index: structural
 - !DB-SC4 — session_aliases schema: structural; aliasing covered by SCM-AL2/AL3 tests
 - !DB-SC5 — session_aliases primary index: structural
+- !SCM-AL5 — list_session_commits integration: covered transitively by SCM-AL2/AL4 unit tests + needs Tauri state
 - !DB-MG1 — IF NOT EXISTS idempotence: structural
 - !DB-MG2 — ALTER TABLE swallow duplicate-column: structural, integration
 - !DB-MG3 — legacy table preservation: structural, integration

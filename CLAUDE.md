@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 When doing any feature work or behavior changes, follow the woke2 skill at `.claude/skills/woke2/SKILL.md`.
 
-Before writing code: define or update behaviors in `*.spec.md` files.
-After writing code: add `// woke2 impl` / `// woke2 test` pragmas, then run `npm run woke2:check`.
+Always define or update behaviors in `*.spec.md` files BEFORE writing code.
+Add `// woke2 impl` / `// woke2 test` pragmas, as you go, or at the end.
+Run `npm run woke2:check` after you've finished.
 
 Backlog tasks live in `backlog/` — one file per task, named `P<priority>_<Description>.md`. Delete the file when the task is finished.
 
