@@ -4,7 +4,6 @@ use std::process::Command;
 use crate::error::Error;
 
 pub const SESSION_TRAILER_KEY: &str = "Slop-Mop-Session-Id";
-pub const CHECKPOINT_SUBJECT: &str = "check point";
 
 pub fn get_head_commit_hash(path: &Path) -> Result<String, Error> {
     let repo = git2::Repository::discover(path)

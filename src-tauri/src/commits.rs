@@ -4,7 +4,7 @@ use git2::{Repository, message_trailers_strs};
 use serde::Serialize;
 
 use crate::error::Error;
-use crate::git::{CHECKPOINT_SUBJECT, SESSION_TRAILER_KEY};
+use crate::git::SESSION_TRAILER_KEY;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SessionCommit {
@@ -46,9 +46,6 @@ pub fn list_session_commits(
         }
 
         let subject = message.lines().next().unwrap_or("").to_string();
-        if subject == CHECKPOINT_SUBJECT {
-            continue;
-        }
 
         out.push(SessionCommit {
             commit_hash: oid.to_string(),

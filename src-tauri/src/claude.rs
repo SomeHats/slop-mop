@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -543,19 +543,95 @@ fn handle_prompt(app: &AppHandle, window_label: &str, agent_id: &str, parsed: &s
 
     match stage_all_and_check_dirty(path) {
         Ok(false) => eprintln!("[hook] checkpoint skipped (clean tree)"),
-        Ok(true) => {
-            let payload = CommitStatusEvent {
-                agent_id: agent_id.to_string(),
-            };
-            emit_to_window(app, window_label, "commit-started", payload.clone());
-            match commit_with_session_trailer(path, &session_id, "check point") {
-                Ok(()) => eprintln!("[hook] checkpoint committed"),
-                Err(e) => eprintln!("[hook] checkpoint commit failed: {e}"),
-            }
-            emit_to_window(app, window_label, "commit-finished", payload);
-        }
+        Ok(true) => commit_staged_and_emit(
+            app,
+            window_label,
+            agent_id,
+            path,
+            &session_id,
+            // No `Prompt:` body — checkpoints capture work the user did
+            // before any prompt, so there's no prompt to attribute it to.
+            None,
+            // Fallback subject if `claude -p` is unavailable.
+            "check point",
+        ),
         Err(e) => eprintln!("[hook] checkpoint stage failed: {e}"),
     }
+}
+
+/// Commit the currently-staged changes with a generated message + session
+/// trailer, emit `commit-started`/`commit-finished` around the commit, and
+/// emit `prompt-committed` so the chat sidebar picks it up. Used by both
+/// the checkpoint (UserPromptSubmit) and post-prompt (Stop) paths so they
+/// produce visually identical commits.
+#[allow(clippy::too_many_arguments)]
+fn commit_staged_and_emit(
+    app: &AppHandle,
+    window_label: &str,
+    agent_id: &str,
+    path: &Path,
+    session_id: &str,
+    body_prompt: Option<&str>,
+    fallback_subject: &str,
+) {
+    let status_payload = CommitStatusEvent {
+        agent_id: agent_id.to_string(),
+    };
+    emit_to_window(app, window_label, "commit-started", status_payload.clone());
+
+    // Ask claude -p to generate a commit message from the staged diff. Fall
+    // back to a caller-supplied subject if it fails (network/auth/etc.) so
+    // we never lose a commit.
+    let generated = match generate_commit_message(path) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("[hook] claude -p failed, using fallback subject: {e}");
+            fallback_subject.to_string()
+        }
+    };
+    // Trailing blank line is load-bearing: without it, a single-line
+    // `Prompt: …` sits in the same paragraph as the appended
+    // `Slop-Mop-Session-Id` trailer, and git's interpret-trailers treats
+    // `Prompt:` as a trailer too. The blank line forces the appended trailer
+    // into its own block.
+    let full_message = match body_prompt {
+        Some(prompt) => format!("{generated}\n\nPrompt: {prompt}\n\n"),
+        None => format!("{generated}\n\n"),
+    };
+    let subject = first_line(&generated);
+
+    let commit_result = commit_with_session_trailer(path, session_id, &full_message);
+    emit_to_window(app, window_label, "commit-finished", status_payload);
+    if let Err(e) = commit_result {
+        eprintln!("[hook] commit failed: {e}");
+        return;
+    }
+
+    let commit_hash = match get_head_commit_hash(path) {
+        Ok(h) => h,
+        Err(e) => {
+            eprintln!("[hook] get HEAD failed: {e}");
+            return;
+        }
+    };
+    let timestamp_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+
+    emit_to_window(
+        app,
+        window_label,
+        "prompt-committed",
+        PromptCommittedEvent {
+            agent_id: agent_id.to_string(),
+            session_id: session_id.to_string(),
+            commit_hash,
+            prompt: subject,
+            timestamp_unix,
+        },
+    );
+    eprintln!("[hook] commit emitted");
 }
 
 /// Stop: commit Claude's changes (if any) with the prompt as the message.
@@ -615,56 +691,16 @@ fn handle_stop_inner(
         return;
     }
 
-    let status_payload = CommitStatusEvent {
-        agent_id: agent_id.to_string(),
-    };
-    emit_to_window(app, window_label, "commit-started", status_payload.clone());
-
-    // Ask claude -p to generate a commit message from the staged diff. Fall
-    // back to the prompt's first line if it fails (network/auth/etc.) so the
-    // user never loses a commit.
-    let generated = match generate_commit_message(path) {
-        Ok(m) => m,
-        Err(e) => {
-            eprintln!("[hook] stop: claude -p failed, falling back to prompt: {e}");
-            first_line(&prompt)
-        }
-    };
-    // Trailing blank line is load-bearing: without it, a single-line `Prompt: …`
-    // sits in the same paragraph as the appended `Slop-Mop-Session-Id` trailer,
-    // and git's interpret-trailers treats `Prompt:` as a trailer too. The blank
-    // line forces the appended trailer into its own block.
-    let full_message = format!("{generated}\n\nPrompt: {prompt}\n\n");
-    let subject = first_line(&generated);
-
-    let commit_result = commit_with_session_trailer(path, &session_id, &full_message);
-    emit_to_window(app, window_label, "commit-finished", status_payload);
-    if let Err(e) = commit_result {
-        eprintln!("[hook] stop commit failed: {e}");
-        return;
-    }
-
-    let commit_hash = match get_head_commit_hash(path) {
-        Ok(h) => h,
-        Err(e) => {
-            eprintln!("[hook] stop: get HEAD failed: {e}");
-            return;
-        }
-    };
-    let timestamp_unix = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
-
-    let event = PromptCommittedEvent {
-        agent_id: agent_id.to_string(),
-        session_id,
-        commit_hash,
-        prompt: subject,
-        timestamp_unix,
-    };
-    emit_to_window(app, window_label, "prompt-committed", event);
-    eprintln!("[hook] stop commit emitted");
+    commit_staged_and_emit(
+        app,
+        window_label,
+        agent_id,
+        path,
+        &session_id,
+        Some(&prompt),
+        // Fallback subject if `claude -p` is unavailable: the prompt's first line.
+        &first_line(&prompt),
+    );
 }
 
 fn take_pending_prompt(app: &AppHandle, agent_id: &str) -> Option<String> {
