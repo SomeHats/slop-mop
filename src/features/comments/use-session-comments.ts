@@ -179,11 +179,14 @@ export function useSessionComments(
   const prepareSubmit = useCallback((): { ids: string[]; items: SubmittableComment[] } => {
     const stagedSet = stagedRef.current
     const wp = workdirProjectionsRef.current
+    // Sort oldest → newest by created_at so the agent reads comments in the
+    // order the user wrote them. ISO-8601 timestamps compare lexically.
+    const ordered = [...commentsRef.current].sort((a, b) =>
+      a.created_at.localeCompare(b.created_at),
+    )
     const ids: string[] = []
     const items: SubmittableComment[] = []
-    // Iterate `comments` in display order so the formatted prompt mirrors
-    // what the user sees in the panel.
-    for (const c of commentsRef.current) {
+    for (const c of ordered) {
       if (!stagedSet.has(c.id)) continue
       const item = commentForSubmit({
         comment: c,

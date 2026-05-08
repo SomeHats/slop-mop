@@ -14,29 +14,23 @@ pub struct Project {
     pub opened_at: String,
 }
 
-/// Resolve a path to the root of its main git repository.
-/// If the path is inside a worktree, follows `commondir` back to the main repo.
-/// The result is canonicalized to ensure consistent paths regardless of symlinks
-/// or trailing slashes.
-pub fn resolve_repo_root(path: &Path) -> Result<PathBuf, Error> {
+/// Resolve a path to the working directory of its git repository — main repo
+/// or worktree, whichever the user actually opened. Worktrees are first-class
+/// projects in Slop Mop: opening a worktree means Claude runs in the worktree
+/// and commits to the worktree's branch. Canonicalized so equivalent paths
+/// (symlinks, trailing slashes) map to the same project row.
+pub fn resolve_workdir(path: &Path) -> Result<PathBuf, Error> {
     let repo = git2::Repository::discover(path)
         .map_err(|_| Error::NotAGitRepo(path.display().to_string()))?;
 
-    let root = if repo.is_worktree() {
-        // commondir points to the main repo's .git directory
-        let common_dir = repo.commondir().to_path_buf();
-        common_dir
-            .parent()
-            .map(|p| p.to_path_buf())
-            .ok_or_else(|| Error::InvalidPath(common_dir.display().to_string()))?
-    } else {
-        repo.workdir()
-            .map(|p| p.to_path_buf())
-            .ok_or_else(|| Error::NotAGitRepo("bare repository".to_string()))?
-    };
+    let workdir = repo
+        .workdir()
+        .map(|p| p.to_path_buf())
+        .ok_or_else(|| Error::NotAGitRepo("bare repository".to_string()))?;
 
-    root.canonicalize()
-        .map_err(|_| Error::InvalidPath(root.display().to_string()))
+    workdir
+        .canonicalize()
+        .map_err(|_| Error::InvalidPath(workdir.display().to_string()))
 }
 
 fn get_project_name(path: &Path) -> String {
@@ -49,9 +43,9 @@ fn get_project_name(path: &Path) -> String {
 /// Resolve a directory path to a git repo root, upsert into the DB, and return the project.
 /// Used by both the `open_project` command and `window::open_project_window`.
 pub fn upsert_project(db: &Db, path: &str) -> Result<Project, Error> {
-    let repo_root = resolve_repo_root(Path::new(path))?;
-    let repo_path = repo_root.to_string_lossy().to_string();
-    let name = get_project_name(&repo_root);
+    let workdir = resolve_workdir(Path::new(path))?;
+    let workdir_path = workdir.to_string_lossy().to_string();
+    let name = get_project_name(&workdir);
     let id = uuid::Uuid::new_v4().to_string();
 
     let conn = db.0.lock().map_err(|e| Error::Database(e.to_string()))?;
@@ -59,14 +53,14 @@ pub fn upsert_project(db: &Db, path: &str) -> Result<Project, Error> {
     conn.execute(
         "INSERT INTO projects (id, name, path, opened_at) VALUES (?1, ?2, ?3, datetime('now'))
          ON CONFLICT(path) DO UPDATE SET opened_at = datetime('now'), name = excluded.name",
-        rusqlite::params![id, name, repo_path],
+        rusqlite::params![id, name, workdir_path],
     )
     .map_err(|e| Error::Database(e.to_string()))?;
 
     let project = conn
         .query_row(
             "SELECT id, name, path, opened_at FROM projects WHERE path = ?1",
-            rusqlite::params![repo_path],
+            rusqlite::params![workdir_path],
             |row| {
                 Ok(Project {
                     id: row.get(0)?,
