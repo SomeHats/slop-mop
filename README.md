@@ -21,11 +21,10 @@ For now, this only supports Claude Code. Getting the robot to add support for ot
 If you just want to use Slop Mop (not hack on it), clone the repo, then:
 
 ```sh
-pnpm install
 pnpm install-mac-app
 ```
 
-That builds a macOS bundle and copies `Slop Mop.app` to your `/Applications` folder. Open it like any other app.
+That installs dependencies, builds a macOS bundle, and copies `Slop Mop.app` to your `/Applications` folder. If a copy is already installed it'll prompt before overwriting. Open it like any other app.
 
 Re-run `pnpm install-mac-app` whenever you pull new changes to upgrade. (No auto-update yet — see the warning above.)
 

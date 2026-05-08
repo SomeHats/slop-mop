@@ -7,7 +7,7 @@
     "dev": "tauri dev",
     "dev:vite": "vite",
     "build": "tauri build",
-    "install-mac-app": "pnpm build && rm -rf '/Applications/Slop Mop.app' && cp -R 'src-tauri/target/release/bundle/macos/Slop Mop.app' '/Applications/Slop Mop.app'",
+    "install-mac-app": "bash scripts/install-mac-app.sh",
     "build:frontend": "tsc -b && vite build",
     "preview": "vite preview",
     "check": "biome check .",
