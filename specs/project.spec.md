@@ -27,6 +27,7 @@ A "project" is a git repo workdir. Worktrees are first-class — opening a workt
 - !PRJ-ST2 `read_project_settings` returns `ProjectSettings::default()` if the row is missing or the JSON is malformed — settings failures must never break commits
 - !PRJ-ST3 `update_project_settings` serializes to JSON and updates the row
 - !PRJ-ST4 The frontend sees `ProjectSettings` with camelCase keys; the Rust struct uses snake_case fields
+- !PRJ-ST5 `ProjectSettings.ignore_whitespace` is a boolean (default `false`) persisted in the same JSON blob; missing-from-JSON deserializes to `false`
 
 ## Branch resolution
 

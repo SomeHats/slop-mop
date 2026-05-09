@@ -5,11 +5,12 @@ import type { BranchPrefixMode, ProjectSettings } from "@/lib/types"
 export type UseProjectSettings = {
   settings: ProjectSettings
   branchPrefixMode: BranchPrefixMode
+  ignoreWhitespace: boolean
   /** Update one or more settings. Optimistic; reverts on backend error. */
   update: (partial: Partial<ProjectSettings>) => void
 }
 
-// woke2 impl PFE-PS1, PFE-PS2, PFE-PS3
+// woke2 impl PFE-PS1, PFE-PS2, PFE-PS3, PFE-PS4
 export function useProjectSettings(projectId: string): UseProjectSettings {
   const [settings, setSettings] = useState<ProjectSettings>({})
   // Snapshot for optimistic-revert.
@@ -48,6 +49,7 @@ export function useProjectSettings(projectId: string): UseProjectSettings {
   return {
     settings,
     branchPrefixMode: settings.branchPrefixMode ?? "none",
+    ignoreWhitespace: settings.ignoreWhitespace ?? false,
     update,
   }
 }

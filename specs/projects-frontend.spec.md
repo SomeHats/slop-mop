@@ -26,9 +26,11 @@ The frontend for the [project picker](project.spec.md). The picker window appear
 - !PFE-ST4 `featurePart` mirrors the backend's `feature` mode: strip up to and including the first `/`; branches without `/` return their own name
 - !PFE-ST5 Settings updates are written through `onUpdate` → `useProjectSettings.update`
 - !PFE-ST6 The settings button has `data-tauri-no-drag-region` so the title-bar drag doesn't swallow clicks
+- !PFE-ST7 A separate "Diff" section in the popover holds an "Ignore whitespace" Switch wired to `ignoreWhitespace`; flipping it calls `onUpdate({ ignoreWhitespace })`
 
 ## useProjectSettings
 
 - !PFE-PS1 Loads the saved settings on mount and keeps a `lastSavedRef` snapshot for optimistic-revert
 - !PFE-PS2 `update` applies the partial optimistically, then writes through `tauri.updateProjectSettings`; on error reverts both the state and the snapshot
 - !PFE-PS3 `branchPrefixMode` defaults to `none` when the saved settings have no value
+- !PFE-PS4 `ignoreWhitespace` defaults to `false` when the saved settings have no value

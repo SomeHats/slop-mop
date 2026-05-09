@@ -83,8 +83,14 @@ export function getRangeDiff(
   projectPath: string,
   olderHash: string | null,
   newerHash: string | null,
+  ignoreWhitespace: boolean,
 ): Promise<FileDiff[]> {
-  return invoke<FileDiff[]>("get_range_diff", { projectPath, olderHash, newerHash })
+  return invoke<FileDiff[]>("get_range_diff", {
+    projectPath,
+    olderHash,
+    newerHash,
+    ignoreWhitespace,
+  })
 }
 
 export function startWatching(projectPath: string): Promise<void> {

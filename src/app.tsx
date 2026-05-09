@@ -86,6 +86,7 @@ function ProjectApp({
   const { fileDiffs: realFileDiffs, isLoading: isDiffLoading } = useRangeDiff(
     projectPath,
     selection,
+    projectSettings.ignoreWhitespace,
   )
 
   const sessionComments = useSessionComments(projectPath, session.sessionId, selection)
@@ -233,6 +234,7 @@ function ProjectApp({
           <ProjectSettingsButton
             projectPath={projectPath}
             branchPrefixMode={projectSettings.branchPrefixMode}
+            ignoreWhitespace={projectSettings.ignoreWhitespace}
             onUpdate={projectSettings.update}
           />
         </div>

@@ -23,6 +23,7 @@ Drives the [diff viewer](diff-viewer.spec.md) — fetches `getRangeDiff` and ref
 - !RD-3 Cancellation flag drops late results
 - !RD-4 Subscribes to `fs-change` and refetches *only* when the selection's `newer` end is `null` (workdir) — fixed-commit ranges aren't affected by editor changes
 - !RD-5 FS-change refetches are debounced 200ms so a save burst doesn't trigger a flurry of fetches
+- !RD-6 `ignoreWhitespace` is part of the cache key and is forwarded to `getRangeDiff`; toggling it triggers a refetch and FS-change refetches use the latest value
 
 ## useFullscreen
 

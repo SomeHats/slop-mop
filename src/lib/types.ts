@@ -9,6 +9,7 @@ export type BranchPrefixMode = "none" | "full" | "feature"
 
 export type ProjectSettings = {
   branchPrefixMode?: BranchPrefixMode
+  ignoreWhitespace?: boolean
 }
 
 declare global {

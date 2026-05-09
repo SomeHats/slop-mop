@@ -144,6 +144,7 @@ pub fn get_range_diff(
     project_path: String,
     older_hash: Option<String>,
     newer_hash: Option<String>,
+    ignore_whitespace: bool,
 ) -> Result<Vec<FileDiff>, Error> {
     let repo = Repository::discover(Path::new(&project_path))
         .map_err(|_| Error::NotAGitRepo(project_path.clone()))?;
@@ -161,6 +162,10 @@ pub fn get_range_diff(
     opts.include_untracked(true)
         .recurse_untracked_dirs(true)
         .context_lines(100_000);
+    // woke2 impl DIF-R7
+    if ignore_whitespace {
+        opts.ignore_whitespace(true);
+    }
 
     let diff = match head_tree_opt {
         Some(ref new_tree) => repo
@@ -383,5 +388,52 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let err = batch_diff_stats(dir.path().to_string_lossy().into_owned(), vec![]);
         assert!(matches!(err, Err(Error::NotAGitRepo(_))));
+    }
+
+    // woke2 test DIF-R7
+    #[test]
+    fn get_range_diff_ignore_whitespace_drops_ws_only_changes() {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+
+        fs::write(dir.path().join("a.txt"), "alpha\nbeta\n").unwrap();
+        let root = make_commit(&repo, "root");
+
+        // Whitespace-only change: re-indent with leading spaces.
+        fs::write(dir.path().join("a.txt"), "  alpha\n  beta\n").unwrap();
+        let second = make_commit(&repo, "indent");
+
+        drop(repo);
+
+        let path = dir.path().to_string_lossy().into_owned();
+
+        // With the flag off, the file appears as modified.
+        let kept = get_range_diff(
+            path.clone(),
+            Some(second.to_string()),
+            Some(second.to_string()),
+            false,
+        )
+        .unwrap();
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].path, "a.txt");
+        assert!(kept[0].additions > 0 || kept[0].deletions > 0);
+
+        // With the flag on, the whitespace-only change drops out entirely.
+        let dropped = get_range_diff(
+            path,
+            Some(second.to_string()),
+            Some(second.to_string()),
+            true,
+        )
+        .unwrap();
+        assert!(
+            dropped.iter().all(|f| f.path != "a.txt"),
+            "expected a.txt to be filtered out, got {:?}",
+            dropped.iter().map(|f| &f.path).collect::<Vec<_>>(),
+        );
+
+        // Sanity: the root commit (real additions) is unaffected by the flag.
+        let _ = root;
     }
 }

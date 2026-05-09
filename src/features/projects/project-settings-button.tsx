@@ -1,5 +1,5 @@
 import { Settings } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useId, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -10,6 +10,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { getHeadBranch } from "@/lib/tauri"
 import type { BranchPrefixMode, ProjectSettings } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -17,12 +19,14 @@ import { cn } from "@/lib/utils"
 type Props = {
   projectPath: string
   branchPrefixMode: BranchPrefixMode
+  ignoreWhitespace: boolean
   onUpdate: (partial: Partial<ProjectSettings>) => void
 }
 
 export function ProjectSettingsButton({
   projectPath,
   branchPrefixMode,
+  ignoreWhitespace,
   onUpdate,
 }: Props): React.JSX.Element {
   const [branch, setBranch] = useState<string | null>(null)
@@ -47,7 +51,9 @@ export function ProjectSettingsButton({
     }
   }, [open, projectPath])
 
-  // woke2 impl PFE-ST2, PFE-ST3, PFE-ST5, PFE-ST6
+  const ignoreWhitespaceId = useId()
+
+  // woke2 impl PFE-ST2, PFE-ST3, PFE-ST5, PFE-ST6, PFE-ST7
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -90,6 +96,21 @@ export function ProjectSettingsButton({
             unavailable={branch === null}
           />
         </RadioGroup>
+        <Separator />
+        <PopoverHeader>
+          <PopoverTitle>Diff</PopoverTitle>
+        </PopoverHeader>
+        <label
+          htmlFor={ignoreWhitespaceId}
+          className="flex cursor-pointer items-center justify-between gap-2.5 px-1.5 py-1.5 text-xs"
+        >
+          <span className="font-medium">Ignore whitespace</span>
+          <Switch
+            id={ignoreWhitespaceId}
+            checked={ignoreWhitespace}
+            onCheckedChange={(next) => onUpdate({ ignoreWhitespace: next })}
+          />
+        </label>
       </PopoverContent>
     </Popover>
   )

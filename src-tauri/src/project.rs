@@ -15,11 +15,12 @@ pub struct Project {
     pub opened_at: String,
 }
 
-// woke2 impl PRJ-ST4
+// woke2 impl PRJ-ST4, PRJ-ST5
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProjectSettings {
     pub branch_prefix_mode: BranchPrefixMode,
+    pub ignore_whitespace: bool,
 }
 
 /// Resolve a path to the working directory of its git repository — main repo

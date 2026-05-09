@@ -147,6 +147,7 @@ Commands that need Tauri state (commits.rs, comments.rs, project.rs, watcher.rs,
 - !PRJ-ST2 — default on parse error: needs DB state
 - !PRJ-ST3 — UPDATE statement: needs DB state
 - !PRJ-ST4 — camelCase serde: trivial derive
+- !PRJ-ST5 — ignore_whitespace field default: trivial bool default; round-trip is covered by serde derive shared with PRJ-ST4
 - !PRJ-BR1 — get_head_branch command: needs Tauri context
 - !PRJ-CP1 — current_prefix: needs Tauri state + DB
 - !PRJ-CP2 — None edge cases: needs Tauri state + DB
@@ -354,9 +355,11 @@ Project picker / settings UI:
 - !PFE-ST4 — featurePart helper
 - !PFE-ST5 — onUpdate plumbing
 - !PFE-ST6 — no-drag region
+- !PFE-ST7 — ignore-whitespace switch: DOM rendering
 - !PFE-PS1 — load saved settings
 - !PFE-PS2 — optimistic update + revert
 - !PFE-PS3 — default mode `none`
+- !PFE-PS4 — default `ignoreWhitespace` `false`: trivial fallback
 - !SES-DG1 — open binding to `pending !== null`: DOM rendering
 - !SES-DG2 — non-dismissibility: DOM rendering
 - !SES-DG3 — source hint + action handlers: DOM rendering
@@ -398,6 +401,7 @@ Misc hooks (use-diff-stats, use-range-diff, use-fullscreen, use-scroll-into-view
 - !RD-3 — cancellation drop
 - !RD-4 — fs-change only when newer null
 - !RD-5 — 200ms debounce
+- !RD-6 — ignoreWhitespace cache key + forward: shares the same React-hook fixture gap as RD-1..5
 - !FS-1 — initial fullscreen read
 - !FS-2 — onResized subscription
 - !SV-1 — double rAF wait

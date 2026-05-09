@@ -27,6 +27,7 @@ The Rust backend produces structured diffs that the frontend renders. See [comme
 - !DIF-R4 Includes untracked files recursively
 - !DIF-R5 100,000 context lines so the entire file is returned (frontend computes its own collapsing)
 - !DIF-R6 Returns `FileDiff[]` with status (`added`/`deleted`/`modified`/`renamed`/`copied`/`typechange`/`unknown`), old path on rename, hunks with `(old_start, old_lines, new_start, new_lines)`, and `HunkLine[]` carrying origin (`+`/`-`/` `), content, and old/new line numbers
+- !DIF-R7 `ignore_whitespace = true` enables git2 `DiffOptions::ignore_whitespace` so whitespace-only line changes don't appear as differences (whitespace-only file changes drop out of the result entirely); default `false` matches plain `git diff`
 
 ## Line collation
 

@@ -10,22 +10,27 @@ type UseRangeDiffResult = {
 
 const DEBOUNCE_MS = 200
 
-function selectionKey(sel: Selection | null): string {
+function selectionKey(sel: Selection | null, ignoreWhitespace: boolean): string {
   if (!sel) return ""
-  return `${sel.older ?? "_"}|${sel.newer ?? "_"}`
+  return `${sel.older ?? "_"}|${sel.newer ?? "_"}|${ignoreWhitespace ? "1" : "0"}`
 }
 
-// woke2 impl RD-1, RD-2, RD-3, RD-4, RD-5
-export function useRangeDiff(projectPath: string, selection: Selection | null): UseRangeDiffResult {
+// woke2 impl RD-1, RD-2, RD-3, RD-4, RD-5, RD-6
+export function useRangeDiff(
+  projectPath: string,
+  selection: Selection | null,
+  ignoreWhitespace: boolean,
+): UseRangeDiffResult {
   const [fileDiffs, setFileDiffs] = useState<FileDiff[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const prevKeyRef = useRef("")
   const selectionRef = useRef<Selection | null>(null)
+  const ignoreWhitespaceRef = useRef(ignoreWhitespace)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchDiff = useCallback(
-    (sel: Selection, signal: { cancelled: boolean }): void => {
-      getRangeDiff(projectPath, sel.older, sel.newer).then(
+    (sel: Selection, ignoreWs: boolean, signal: { cancelled: boolean }): void => {
+      getRangeDiff(projectPath, sel.older, sel.newer, ignoreWs).then(
         (diffs) => {
           if (signal.cancelled) return
           setFileDiffs(diffs)
@@ -43,6 +48,7 @@ export function useRangeDiff(projectPath: string, selection: Selection | null): 
 
   useEffect(() => {
     selectionRef.current = selection
+    ignoreWhitespaceRef.current = ignoreWhitespace
 
     if (!selection) {
       setFileDiffs([])
@@ -51,18 +57,18 @@ export function useRangeDiff(projectPath: string, selection: Selection | null): 
       return
     }
 
-    const key = selectionKey(selection)
+    const key = selectionKey(selection, ignoreWhitespace)
     if (key === prevKeyRef.current) return
     prevKeyRef.current = key
 
     const signal = { cancelled: false }
     setIsLoading(true)
-    fetchDiff(selection, signal)
+    fetchDiff(selection, ignoreWhitespace, signal)
 
     return () => {
       signal.cancelled = true
     }
-  }, [selection, fetchDiff])
+  }, [selection, ignoreWhitespace, fetchDiff])
 
   // Live-refresh when the working tree changes — but only if the selection's
   // `newer` end is the workdir (otherwise the diff is between fixed commits
@@ -75,7 +81,10 @@ export function useRangeDiff(projectPath: string, selection: Selection | null): 
       if (!sel || sel.newer !== null) return
 
       if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => fetchDiff(sel, signal), DEBOUNCE_MS)
+      debounceRef.current = setTimeout(
+        () => fetchDiff(sel, ignoreWhitespaceRef.current, signal),
+        DEBOUNCE_MS,
+      )
     })
 
     return () => {
