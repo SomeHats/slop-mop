@@ -48,5 +48,5 @@ The sidebar lists the user's prompt commits — one row per commit, plus a stick
 When the user runs `/clear` (or `/compact`, `/resume` to a known session) mid-flow, subsequent commits carry a different claude trailer id even though they belong to the same slop-mop primary. The sidebar marks each such transition between adjacent commit rows.
 
 - !CHT-DV1 Renders a divider between any two adjacent commit rows whose `session_id` trailer values differ (newer above, older below)
-- !CHT-DV2 Divider visual: full sidebar width, label `/clear` in muted-foreground flanked by horizontal rule lines; no rail node and no rail half-lines drawn in its column
+- !CHT-DV2 Divider visual: a thin row with its own `border-t`, a continuous rail vertical line drawn through the rail column (no node), and the `/clear` label in muted-foreground inline to the right of the rail. The next commit row's existing `border-t` closes the bottom of the divider
 - !CHT-DV3 Divider is inert: not part of the rail row index, no mouse handlers, doesn't break selection ranges or drag (a drag from the row above to the row below proceeds as if the divider weren't there)
