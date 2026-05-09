@@ -1,6 +1,6 @@
 ---
 name: woke2
-description: "woke2: behavior spec system for defining, tracking, and verifying features via *.spec.md files and code pragmas. Use when implementing, modifying, or reviewing features — ensures specs exist before code. Also manages the project backlog, provides /wake for interview-driven feature design from a starting prompt, and /audit for branch-level circumspection review."
+description: "woke2: behavior spec system for defining, tracking, and verifying features via *.spec.md files and code pragmas. Use when implementing, modifying, or reviewing features — ensures specs exist before code. Also manages the project backlog and exposes /woke2-build (interview-driven feature design), /woke2-audit (branch-level circumspection review), and /woke2-hyperaudit (exhaustive itemized audit)."
 ---
 
 # woke2 — Behavior Specs, Backlog & Traceability
@@ -227,14 +227,14 @@ When a backlog task is finished, **delete** the task file from `backlog/`.
 
 Create a file in `backlog/` following the naming convention. Choose the priority thoughtfully — P0 means "next up", not "important in the abstract."
 
-## /wake
+## /woke2-build
 
-Take a starting prompt for a new feature or change and drive it from idea to working, spec-traced code. Surveys existing specs, interviews the user one decision at a time (always with a recommended answer), writes/updates specs, builds a todo list of behaviors to implement, works through them, and reconciles spec ↔ code at the end. Full procedure in [wake](wake.md).
+Take a starting prompt for a new feature or change and drive it from idea to working, spec-traced code. Surveys existing specs, interviews the user one decision at a time (always with a recommended answer), writes/updates specs, builds a todo list of behaviors to implement, works through them, and reconciles spec ↔ code at the end. Full procedure in [build](build.md).
 
-## /audit
+## /woke2-audit
 
 Perform the workflow exactly as described in [audit](audit.md).
 
-## /hyperaudit
+## /woke2-hyperaudit
 
 Perform the exhaustive audit as described in [hyperaudit](hyperaudit.md). Writes a full itemized report to `hyperaudit-report.md`.

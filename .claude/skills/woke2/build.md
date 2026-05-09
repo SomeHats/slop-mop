@@ -1,4 +1,4 @@
-# /wake
+# /woke2-build
 
 Take a vague feature idea and turn it into specs + working code, with the user fully in the loop on every design decision. Interview-driven. Spec-first. Implementation-second. Review-last.
 
@@ -6,7 +6,7 @@ The shape: **Survey → Interview → Spec → Implement → Reconcile.** Each p
 
 ## Phase 0 — Receive prompt
 
-The user invokes `/wake <prompt>` where `<prompt>` is a free-form description of a feature or change. It may be vague ("add auth"), partial ("make the comment panel collapsible"), or detailed ("add a SQLite-backed cache for projection results, invalidated on commit"). Treat it as a starting point, not a finished design.
+The user invokes `/woke2-build <prompt>` where `<prompt>` is a free-form description of a feature or change. It may be vague ("add auth"), partial ("make the comment panel collapsible"), or detailed ("add a SQLite-backed cache for projection results, invalidated on commit"). Treat it as a starting point, not a finished design.
 
 If no prompt is supplied, ask the user what they want to build before doing anything else.
 
@@ -23,7 +23,7 @@ Output a short orientation message to the user (3–6 lines): which specs/code/b
 
 ## Phase 2 — Interview
 
-This is the heart of `/wake`. The goal: walk the design tree from root to leaves, resolving each decision before moving to the ones that depend on it.
+This is the heart of `/woke2-build`. The goal: walk the design tree from root to leaves, resolving each decision before moving to the ones that depend on it.
 
 ### Rules of engagement
 

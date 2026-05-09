@@ -1,4 +1,4 @@
-# /audit
+# /woke2-audit
 
 A branch-level review for circumspection: are specs complete, are changes careful, is anything rushed? Is the backlog accurate?
 

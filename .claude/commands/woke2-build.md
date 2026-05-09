@@ -1,8 +1,9 @@
 ---
 description: Interview-driven feature design — survey, interview, spec, implement, reconcile.
+disable-model-invocation: true
 ---
 
-Run the `/wake` workflow defined in `.claude/skills/woke2/wake.md`.
+Run the `/woke2-build` workflow defined in `.claude/skills/woke2/build.md`.
 
 Read that file in full before doing anything else, then execute its phases (Survey → Interview → Spec → Implement → Reconcile) against the following starting prompt:
 

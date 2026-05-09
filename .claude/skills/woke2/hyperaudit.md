@@ -1,10 +1,10 @@
-# /hyperaudit
+# /woke2-hyperaudit
 
-An exhaustive branch-level audit that writes a full markdown report to `hyperaudit-report.md` in the repo root. Unlike `/audit` (which summarizes for chat), `/hyperaudit` documents every item checked at every step so the report serves as a reviewable artifact.
+An exhaustive branch-level audit that writes a full markdown report to `hyperaudit-report.md` in the repo root. Unlike `/woke2-audit` (which summarizes for chat), `/woke2-hyperaudit` documents every item checked at every step so the report serves as a reviewable artifact.
 
 ### Procedure
 
-Follow the same 15 evaluation steps as `/audit` (defined in [audit](audit.md)), but with these differences:
+Follow the same 15 evaluation steps as `/woke2-audit` (defined in [audit](audit.md)), but with these differences:
 
 1. **Output format**: Write the entire report to `hyperaudit-report.md` in the repo root (overwrite if it exists). Do NOT add this file to git. After writing, tell the user the file path.
 
@@ -164,6 +164,6 @@ If all priorities look correct: "All backlog priorities appear appropriate."
 - **Rushed changes**: <any signs?>
 ```
 
-4. **Tone**: Same as `/audit` — neutral, professional. But verbose. Every cell in every table must be filled. Empty tables with a "none" note are fine.
+4. **Tone**: Same as `/woke2-audit` — neutral, professional. But verbose. Every cell in every table must be filled. Empty tables with a "none" note are fine.
 
 5. **No chat summary**: After writing the file, tell the user the path and a one-sentence summary of the overall verdict. Do not repeat the report contents in chat.
