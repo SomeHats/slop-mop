@@ -240,7 +240,7 @@ export function ChatSidebar({
             // woke2 impl CHT-R3, CHT-R4
             return (
               <React.Fragment key={commit.commit_hash}>
-                {showDividerAbove && <SessionBoundaryDivider />}
+                {showDividerAbove && <SessionBoundaryDivider litRail={aboveLit} />}
                 <Row
                   rowKey={commit.commit_hash}
                   isFirst={row.index === 0}
@@ -288,11 +288,16 @@ export function ChatSidebar({
 }
 
 // woke2 impl CHT-DV2, CHT-DV3
-function SessionBoundaryDivider(): React.JSX.Element {
+function SessionBoundaryDivider({ litRail }: { litRail: boolean }): React.JSX.Element {
   return (
     <div aria-hidden="true" className="flex w-full select-none items-stretch">
       <div className="relative w-6 shrink-0">
-        <span className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 bg-muted-foreground/60" />
+        <span
+          className={cn(
+            "absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2",
+            litRail ? "bg-purple-400" : "bg-muted-foreground/60",
+          )}
+        />
       </div>
       <div className="flex-1 border-t border-border py-1.5 pl-1.5 pr-3 font-mono text-[10px] text-muted-foreground/70">
         /clear
