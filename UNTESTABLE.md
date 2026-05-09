@@ -357,6 +357,7 @@ Project picker / settings UI:
 - !SES-DG1 — open binding to `pending !== null`: DOM rendering
 - !SES-DG2 — non-dismissibility: DOM rendering
 - !SES-DG3 — source hint + action handlers: DOM rendering
+- !SES-DG4 — initial focus on "Keep history": DOM rendering
 
 Frontend session hook (use-claude-session.ts):
 

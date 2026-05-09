@@ -36,7 +36,7 @@ function describeSource(source: string): string {
  * primary). The dialog is non-dismissible — one of the two has to be picked
  * so the rest of the UI knows which session to anchor to.
  */
-// woke2 impl SES-DG1, SES-DG2, SES-DG3
+// woke2 impl SES-DG1, SES-DG2, SES-DG3, SES-DG4
 export function NewSessionDialog({
   pending,
   onAccept,
@@ -61,7 +61,7 @@ export function NewSessionDialog({
           <Button type="button" variant="outline" className="flex-1" onClick={onAccept}>
             Clear
           </Button>
-          <Button type="button" className="flex-1" onClick={onAlias}>
+          <Button type="button" className="flex-1" onClick={onAlias} autoFocus>
             Keep history
           </Button>
         </div>
