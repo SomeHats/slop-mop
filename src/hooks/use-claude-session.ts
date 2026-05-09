@@ -152,20 +152,27 @@ export function useClaudeSession(projectPath: string, _projectId: string): Claud
           void listSessionCommits(_projectId, projectPath, evt.payload.session_id).then(
             (loaded) => {
               if (cancelled || agentIdRef.current !== evt.payload.agent_id) return
-              // Mid-flow primary change (e.g. /clear, /compact issuing a
-              // genuinely new id): defer the decision to the user. Don't
-              // touch sessionId / commits yet — the dialog handler will.
-              // woke2 impl UCS-AL1
+              // Mid-flow primary change (e.g. /clear, /compact, /resume
+              // issuing a different id). If we recognize the id —
+              // already aliased, or is itself a primary with commits —
+              // switch silently. Only defer to the user when it's
+              // genuinely novel.
               if (
                 sessionIdRef.current !== null &&
                 loaded.primary_session_id !== sessionIdRef.current
               ) {
-                setPendingNewSession({
-                  newSessionId: evt.payload.session_id,
-                  newPrimary: loaded.primary_session_id,
-                  source: evt.payload.source,
-                })
-                return
+                const isKnown =
+                  loaded.primary_session_id !== evt.payload.session_id || loaded.commits.length > 0
+                if (!isKnown) {
+                  // woke2 impl UCS-AL1
+                  setPendingNewSession({
+                    newSessionId: evt.payload.session_id,
+                    newPrimary: loaded.primary_session_id,
+                    source: evt.payload.source,
+                  })
+                  return
+                }
+                // woke2 impl UCS-AL4
               }
               setSessionId(loaded.primary_session_id)
               setSessionSource(evt.payload.source)

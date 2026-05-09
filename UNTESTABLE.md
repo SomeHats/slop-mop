@@ -382,6 +382,7 @@ Frontend session hook (use-claude-session.ts):
 - !UCS-AL1 — pendingNewSession dispatch on mid-flow id change: needs Tauri event mock
 - !UCS-AL2 — acceptNewSession reseeds: needs Tauri IPC mock
 - !UCS-AL3 — aliasNewSession upserts + refetches: needs Tauri IPC mock
+- !UCS-AL4 — silent switch on known mid-flow id: needs Tauri event mock
 
 Misc hooks (use-diff-stats, use-range-diff, use-fullscreen, use-scroll-into-view):
 
