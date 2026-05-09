@@ -1,3 +1,8 @@
+---
+description: Interview-driven feature design — survey, interview, spec, implement, reconcile.
+disable-model-invocation: true
+---
+
 # /woke2-build
 
 Take a vague feature idea and turn it into specs + working code, with the user fully in the loop on every design decision. Interview-driven. Spec-first. Implementation-second. Review-last.
@@ -77,6 +82,7 @@ Once the user confirms the design summary:
    - Each ID defined exactly once across all specs.
    - Group related behaviors under plain headings.
    - Aim for spec files under ~200 lines; split with cross-links if larger.
+   - Keep behaviors lean: observable contract only. No justification, motivation, or implementation details — those belong in commits, PRs, or backlog files. See "Keep specs lean" in [SKILL.md](SKILL.md).
 2. **Choose IDs carefully.** Use existing prefixes for additions to existing features. Mint new prefixes (3–4 uppercase letters) for genuinely new feature areas.
 3. **Build a TodoWrite list.** For every behavior added or modified, create one todo entry: "Implement !ID — \<short description\>". For removed behaviors, add a todo: "Remove implementation of !ID and clean up pragmas". Do not skip this step — the todos are how Phase 4 stays organized.
 4. **Run `npm run woke2:check`.** It will fail because the new behaviors lack `// woke2 impl` pragmas — that's expected and proves the specs are wired up. Do not try to silence the failure; it's the next phase's job.

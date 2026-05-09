@@ -1,3 +1,8 @@
+---
+description: Branch-level circumspection audit — runs the woke2 audit workflow.
+disable-model-invocation: true
+---
+
 # /woke2-audit
 
 A branch-level review for circumspection: are specs complete, are changes careful, is anything rushed? Is the backlog accurate?

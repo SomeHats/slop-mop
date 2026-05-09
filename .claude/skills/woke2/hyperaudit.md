@@ -1,3 +1,8 @@
+---
+description: Exhaustive itemized branch audit — writes a full report to hyperaudit-report.md.
+disable-model-invocation: true
+---
+
 # /woke2-hyperaudit
 
 An exhaustive branch-level audit that writes a full markdown report to `hyperaudit-report.md` in the repo root. Unlike `/woke2-audit` (which summarizes for chat), `/woke2-hyperaudit` documents every item checked at every step so the report serves as a reviewable artifact.
