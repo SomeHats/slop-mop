@@ -63,6 +63,19 @@ Spec headings (`##`–`######`) must **never** carry a `!ID`. They serve as meta
 
 The checker enforces this: `npm run woke2:check` will fail if a heading contains a `!ID`.
 
+### Keep specs lean
+
+A spec describes **observable behavior** — what the system does, not why it exists or how it is built. A behavior bullet should read like a contract a tester could verify against the running system without seeing the source.
+
+**Do not include:**
+
+- **Justification or motivation** — why the feature exists, what problem it solves, who asked, what alternatives were considered. That context belongs in commit messages, PR descriptions, or `backlog/` task files.
+- **Implementation details** — function names, module paths, algorithms, data-structure choices, framework specifics. The `// woke2 impl` pragma is the link from spec to code; the spec itself stays implementation-agnostic. (Exception: when the behavior _is_ a public interface contract — a Tauri command signature, a serialized format, an exported type — naming the surface is fine, because that name is itself the observable behavior.)
+- **History** — what the behavior used to be, why it changed, deprecation notes.
+- **Restating the heading** — if `## Drag and drop` already groups the behaviors, the bullets don't need to begin with "Dragging…" boilerplate that a reader can infer.
+
+Prefer one tight sentence per behavior. If a behavior needs paragraphs of prose to explain, it is probably several behaviors.
+
 ### Rules
 
 - Each ID may be defined **exactly once** across all spec files. The checker enforces this.
