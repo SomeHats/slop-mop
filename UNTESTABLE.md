@@ -250,6 +250,9 @@ Chat sidebar (chat-sidebar.tsx) — DOM rendering + mouse interactions:
 - !CHT-SL6 — click suppression after drag
 - !CHT-SL7 — mousedown resets suppression
 - !CHT-SL8 — global mouseup cleanup
+- !CHT-DV1 — session boundary divider between adjacent rows
+- !CHT-DV2 — divider visual (label + flanking lines, no rail in column)
+- !CHT-DV3 — divider inert (no handlers, doesn't break selection)
 - !CHT-TM1 — time formatting
 
 Comments UI (composer + panel) — DOM rendering + interaction:

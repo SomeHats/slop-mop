@@ -1,5 +1,5 @@
 import { Loader2, Terminal } from "lucide-react"
-import { useEffect, useMemo, useRef } from "react"
+import React, { useEffect, useMemo, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { DiffStats, Selection, SessionCommit } from "@/lib/types"
@@ -229,42 +229,52 @@ export function ChatSidebar({
             const commit = commits[row.index - 1]
             if (!commit) return null
             const stats = diffStats.get(commit.commit_hash)
+            // The commit immediately *newer* than this one in the list is at
+            // index row.index - 2 in `commits` (row.index - 1 is this commit;
+            // commits is newest-first, so the one above this one is the prior
+            // index). The divider sits between the newer row and this one.
+            // woke2 impl CHT-DV1
+            const newerCommit = commits[row.index - 2]
+            const showDividerAbove =
+              newerCommit !== undefined && newerCommit.session_id !== commit.session_id
             // woke2 impl CHT-R3, CHT-R4
             return (
-              <Row
-                key={commit.commit_hash}
-                rowKey={commit.commit_hash}
-                isFirst={row.index === 0}
-                isLast={row.index === lastRowIndex}
-                inRange={inRange}
-                aboveLit={aboveLit}
-                belowLit={belowLit}
-                onMouseDown={handleMouseDown}
-                onMouseEnter={handleMouseEnter}
-                onMouseUp={handleMouseUp}
-                onClick={handleClick}
-                onDoubleClick={handleDoubleClick}
-              >
-                <div className="flex min-w-0 flex-1 flex-col gap-1" title={commit.message}>
-                  <span className="line-clamp-2 text-xs text-foreground">
-                    {stripPrefix(commit.prompt, currentPrefix)}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
-                      {commit.commit_hash.slice(0, 7)}
-                    </Badge>
-                    {stats && (stats.additions > 0 || stats.deletions > 0) ? (
-                      <span className="text-[10px]">
-                        <span className="text-green-400">+{stats.additions}</span>{" "}
-                        <span className="text-red-400">-{stats.deletions}</span>
-                      </span>
-                    ) : null}
-                    <span className="ml-auto text-[10px] text-muted-foreground">
-                      {formatTime(commit.timestamp_unix)}
+              <React.Fragment key={commit.commit_hash}>
+                {showDividerAbove && <SessionBoundaryDivider />}
+                <Row
+                  rowKey={commit.commit_hash}
+                  isFirst={row.index === 0}
+                  isLast={row.index === lastRowIndex}
+                  inRange={inRange}
+                  aboveLit={aboveLit}
+                  belowLit={belowLit}
+                  onMouseDown={handleMouseDown}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseUp={handleMouseUp}
+                  onClick={handleClick}
+                  onDoubleClick={handleDoubleClick}
+                >
+                  <div className="flex min-w-0 flex-1 flex-col gap-1" title={commit.message}>
+                    <span className="line-clamp-2 text-xs text-foreground">
+                      {stripPrefix(commit.prompt, currentPrefix)}
                     </span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="shrink-0 font-mono text-[10px]">
+                        {commit.commit_hash.slice(0, 7)}
+                      </Badge>
+                      {stats && (stats.additions > 0 || stats.deletions > 0) ? (
+                        <span className="text-[10px]">
+                          <span className="text-green-400">+{stats.additions}</span>{" "}
+                          <span className="text-red-400">-{stats.deletions}</span>
+                        </span>
+                      ) : null}
+                      <span className="ml-auto text-[10px] text-muted-foreground">
+                        {formatTime(commit.timestamp_unix)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </Row>
+                </Row>
+              </React.Fragment>
             )
           })}
           {commits.length === 0 && (
@@ -273,6 +283,20 @@ export function ChatSidebar({
         </div>
       </ScrollArea>
       {bottomPanel}
+    </div>
+  )
+}
+
+// woke2 impl CHT-DV2, CHT-DV3
+function SessionBoundaryDivider(): React.JSX.Element {
+  return (
+    <div
+      aria-hidden="true"
+      className="flex w-full items-center gap-2 px-3 py-1.5 text-[10px] text-muted-foreground/70 select-none"
+    >
+      <span className="h-px flex-1 bg-muted-foreground/30" />
+      <span className="font-mono">/clear</span>
+      <span className="h-px flex-1 bg-muted-foreground/30" />
     </div>
   )
 }

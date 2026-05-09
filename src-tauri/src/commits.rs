@@ -13,6 +13,9 @@ use crate::project::current_prefix;
 #[derive(Debug, Clone, Serialize)]
 pub struct SessionCommit {
     pub commit_hash: String,
+    /// Claude session id as stored in the commit's `Slop-Mop-Session-Id`
+    /// trailer. May be an alias rather than the slop-mop primary; the
+    /// primary is exposed once on `SessionCommitsResult.primary_session_id`.
     pub session_id: String,
     /// First line of the commit message — possibly carrying a branch prefix
     /// (e.g. `alex/foo: subject`). The sidebar strips the *current* prefix
@@ -47,7 +50,7 @@ pub struct SessionCommitsResult {
 // woke2 impl SCM-W1, SCM-W2, SCM-W3, SCM-W4, SCM-O1, SCM-O2, SCM-O3, SCM-AL1
 fn walk_session_commits(
     project_path: &str,
-    primary_session_id: &str,
+    _primary_session_id: &str,
     claude_session_ids: &[String],
 ) -> Result<Vec<SessionCommit>, Error> {
     let repo = Repository::discover(Path::new(project_path))
@@ -67,18 +70,22 @@ fn walk_session_commits(
             Ok(t) => t,
             Err(_) => continue,
         };
-        let matches = trailers
-            .iter()
-            .any(|(k, v)| k == SESSION_TRAILER_KEY && claude_session_ids.iter().any(|s| s == v));
-        if !matches {
+        let trailer_session_id = trailers.iter().find_map(|(k, v)| {
+            if k == SESSION_TRAILER_KEY && claude_session_ids.iter().any(|s| s == v) {
+                Some(v.to_string())
+            } else {
+                None
+            }
+        });
+        let Some(trailer_session_id) = trailer_session_id else {
             continue;
-        }
+        };
 
         let subject = message.lines().next().unwrap_or("").to_string();
 
         out.push(SessionCommit {
             commit_hash: oid.to_string(),
-            session_id: primary_session_id.to_string(),
+            session_id: trailer_session_id,
             prompt: subject,
             message: message.to_string(),
             timestamp_unix: commit.time().seconds(),
@@ -290,9 +297,11 @@ mod tests {
         // Newest first.
         assert_eq!(out[0].prompt, "subject B");
         assert_eq!(out[1].prompt, "subject A");
-        // Both rows surface the primary id, regardless of the trailer that
-        // matched.
-        assert_eq!(out[0].session_id, "original");
+        // Each row surfaces its own trailer-as-stored claude id (so the
+        // sidebar can detect cross-session boundaries between adjacent rows).
+        // The primary is exposed once on SessionCommitsResult, not duplicated
+        // per row.
+        assert_eq!(out[0].session_id, "after-clear");
         assert_eq!(out[1].session_id, "original");
     }
 
