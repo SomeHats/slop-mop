@@ -1,6 +1,6 @@
 ---
 name: woke2
-description: "woke2: behavior spec system for defining, tracking, and verifying features via *.spec.md files and code pragmas. Use when implementing, modifying, or reviewing features — ensures specs exist before code. Also manages the project backlog and provides /audit for branch-level circumspection review."
+description: "woke2: behavior spec system for defining, tracking, and verifying features via *.spec.md files and code pragmas. Use when implementing, modifying, or reviewing features — ensures specs exist before code. Also manages the project backlog, provides /wake for interview-driven feature design from a starting prompt, and /audit for branch-level circumspection review."
 ---
 
 # woke2 — Behavior Specs, Backlog & Traceability
@@ -226,6 +226,10 @@ When a backlog task is finished, **delete** the task file from `backlog/`.
 ### Adding a new task
 
 Create a file in `backlog/` following the naming convention. Choose the priority thoughtfully — P0 means "next up", not "important in the abstract."
+
+## /wake
+
+Take a starting prompt for a new feature or change and drive it from idea to working, spec-traced code. Surveys existing specs, interviews the user one decision at a time (always with a recommended answer), writes/updates specs, builds a todo list of behaviors to implement, works through them, and reconciles spec ↔ code at the end. Full procedure in [wake](wake.md).
 
 ## /audit
 
