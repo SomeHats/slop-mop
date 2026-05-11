@@ -3,6 +3,7 @@ import type {
   AnchorForWorkdir,
   Comment,
   DiffStats,
+  FileBytesResult,
   FileDiff,
   Project,
   ProjectedComment,
@@ -134,6 +135,21 @@ export function getFileLines(
   targetCommit: string | null,
 ): Promise<string[] | null> {
   return invoke<string[] | null>("get_file_lines", { projectPath, filePath, targetCommit })
+}
+
+export function getFileBytes(
+  projectPath: string,
+  filePath: string,
+  targetCommit: string | null,
+): Promise<FileBytesResult> {
+  return invoke<FileBytesResult>("get_file_bytes", { projectPath, filePath, targetCommit })
+}
+
+export function resolveBeforeTarget(
+  projectPath: string,
+  olderHash: string | null,
+): Promise<string | null> {
+  return invoke<string | null>("resolve_before_target", { projectPath, olderHash })
 }
 
 export function projectComments(

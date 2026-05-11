@@ -37,10 +37,7 @@ describe("reconstructOldNewLines", () => {
   test("keeps left-only and right-only rows on their respective sides", () => {
     // A pure-deletion row (left set, right null) and a pure-addition row
     // (left null, right set). Reconstruction must keep each side independent.
-    const rows: SideBySideRow[] = [
-      paired(1, "old", null, null),
-      paired(null, null, 1, "new"),
-    ]
+    const rows: SideBySideRow[] = [paired(1, "old", null, null), paired(null, null, 1, "new")]
     const { oldLines, newLines } = reconstructOldNewLines(rows)
     expect(oldLines).toEqual([{ lineNo: 1, content: "old" }])
     expect(newLines).toEqual([{ lineNo: 1, content: "new" }])

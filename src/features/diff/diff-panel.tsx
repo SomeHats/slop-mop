@@ -16,6 +16,7 @@ export type DiffPanelHandle = {
 }
 
 type DiffPanelProps = {
+  projectPath: string
   fileDiffs: FileDiff[]
   isLoading: boolean
   selection: Selection | null
@@ -39,6 +40,7 @@ type DiffPanelProps = {
 
 // woke2 impl DV-PN1, DV-PN2, DV-PN3, DV-PN4, DV-PN5, DV-PN6, DV-PN7, DV-PN8
 export function DiffPanel({
+  projectPath,
   fileDiffs,
   isLoading,
   selection,
@@ -156,6 +158,8 @@ export function DiffPanel({
             onUpdateComment={onUpdateComment}
             onSubmitComment={onSubmitComment}
             scrollLineRef={refForFile(file.path)}
+            projectPath={projectPath}
+            selection={selection}
           />
         ))}
       </div>

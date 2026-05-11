@@ -97,6 +97,24 @@ Renders the structured diff produced by [diff calculation](diff.spec.md) in a si
 - !DV-IC6 `Esc` cancels (restores the original contents and exits edit mode); `Cmd/Ctrl + Enter` saves
 - !DV-IC7 Successful save calls `onUpdate(trimmedContents)` and exits edit mode
 
+## Image diff
+
+For image files (raster only), the row machinery is replaced with an image-aware visual diff component. Backed by [`get_file_bytes`](diff.spec.md). The file header (path + status badge) still renders.
+
+- !DV-IMG-1 A file is treated as an image when its extension is one of `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.avif`, `.bmp`, `.ico` (case-insensitive)
+- !DV-IMG-2 For image files the image-diff component replaces the row layout for that file; the file path + status badge header still renders
+- !DV-IMG-3 Before slot fetches `parent(older)` (or `HEAD` when `older` is null); after slot fetches `newer` (or workdir when `newer` is null); on rename the before slot uses `old_path`
+- !DV-IMG-4 Each side is fetched independently via `get_file_bytes`; a spinner renders until both sides resolve; per-side label renders for `missing`, load error, or `too_large` (showing size); the other slot still renders
+- !DV-IMG-5 A cancellation flag drops stale fetch results when the file path or selection changes
+- !DV-IMG-6 Three rendering modes: `2-up`, `fade`, `wipe`. Default `2-up`. Mode is per-file React state, not persisted
+- !DV-IMG-7 Mode toggle is a 3-button segmented control centered in the file header
+- !DV-IMG-8 Added (no before) and deleted (no after) image diffs render only in `2-up`; the `fade` and `wipe` toggle buttons are hidden
+- !DV-IMG-9 Both sides share one scale factor: chosen so the larger image fits the available width and a 600 px height cap; images are never upscaled; the smaller image renders proportionally smaller
+- !DV-IMG-10 `2-up`: before and after laid out left/right, each within its half of the panel width, scaled per DV-IMG-9
+- !DV-IMG-11 `fade`: both images overlaid in a shared bounding box (sized per DV-IMG-9); a horizontal slider below the image controls blend (0 = full before, 1 = full after); default 0.5
+- !DV-IMG-12 `wipe`: both images overlaid in a shared bounding box (sized per DV-IMG-9); a vertical divider with a center grab handle reveals before on the left, after on the right; dragging anywhere on the image moves the divider; default at 50%
+- !DV-IMG-13 Click+drag-to-comment is disabled on image diffs
+
 ## Comment-only file diffs
 
 `useCommentOnlyFileDiffs` synthesises FileDiff entries for files that hold non-orphaned comments but didn't change in the active diff range, so commented files always appear in the viewer.

@@ -44,3 +44,15 @@ The Rust backend produces structured diffs that the frontend renders. See [comme
 - !DIF-FL2 `target_commit = None` reads from the workdir (filesystem path under `project_path`)
 - !DIF-FL3 Returns `Ok(None)` when the file doesn't exist at the target (missing blob entry, missing workdir file, or non-utf8 content) — never raises
 - !DIF-FL4 Errors with `NotAGitRepo` when `project_path` isn't inside a git repo
+
+## Binary file-content reads
+
+`get_file_bytes(file_path, target_commit)` returns raw bytes for binary content (used by the image diff viewer). Same target semantics as `get_file_lines`.
+
+- !DIF-FB1 Returns a tagged `FileBytesResult`: `{ kind: "ok", data, mime }` (base64-encoded bytes plus extension-derived mime type) for blobs ≤ 5 MB, `{ kind: "too_large", size }` for larger blobs (size in bytes), `{ kind: "missing" }` when the file doesn't exist at the target. Reads commit blob when `target_commit = Some`, workdir file when `None`. Errors only on `NotAGitRepo`.
+
+## Diff target resolution
+
+`resolve_before_target(older_hash)` resolves the "before" commit hash for an image-diff selection, matching the base-tree rules used by `get_range_diff`.
+
+- !DIF-RT1 Returns `parent(older_hash)` when `older_hash` is `Some`, or the HEAD commit hash when `None`. Returns `Ok(None)` when there is no parent (root commit) or no HEAD (empty repo). Errors only on `NotAGitRepo`.

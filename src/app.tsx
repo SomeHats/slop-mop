@@ -306,6 +306,7 @@ function ProjectApp({
           {!showTerminal && (
             <div className="absolute inset-0 bg-background">
               <DiffPanel
+                projectPath={projectPath}
                 fileDiffs={fileDiffs}
                 isLoading={isDiffLoading}
                 selection={selection}

@@ -1,9 +1,38 @@
 use std::path::Path;
 
+use base64::engine::general_purpose::STANDARD as B64;
+use base64::Engine as _;
 use git2::{Delta, DiffFormat, DiffOptions, Repository, Tree};
 use serde::Serialize;
 
 use crate::error::Error;
+
+const FILE_BYTES_MAX: u64 = 5 * 1024 * 1024;
+
+fn mime_for_extension(file_path: &str) -> &'static str {
+    let ext = Path::new(file_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase());
+    match ext.as_deref() {
+        Some("png") => "image/png",
+        Some("jpg" | "jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("avif") => "image/avif",
+        Some("bmp") => "image/bmp",
+        Some("ico") => "image/x-icon",
+        _ => "application/octet-stream",
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FileBytesResult {
+    Ok { data: String, mime: String },
+    Missing,
+    TooLarge { size: u64 },
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct DiffStats {
@@ -315,6 +344,86 @@ pub fn get_file_lines(
     }))
 }
 
+/// Read raw bytes for a file at `target_commit` (or workdir when `None`) and
+/// return a tagged result. Used by the image diff viewer for binary content.
+// woke2 impl DIF-FB1
+#[tauri::command]
+pub fn get_file_bytes(
+    project_path: String,
+    file_path: String,
+    target_commit: Option<String>,
+) -> Result<FileBytesResult, Error> {
+    let repo = Repository::discover(Path::new(&project_path))
+        .map_err(|_| Error::NotAGitRepo(project_path.clone()))?;
+
+    let bytes: Option<Vec<u8>> = match target_commit {
+        Some(hash) => {
+            let tree = commit_tree(&repo, &hash)?;
+            match tree.get_path(Path::new(&file_path)) {
+                Ok(entry) => {
+                    let blob = repo.find_blob(entry.id()).map_err(Error::Git)?;
+                    Some(blob.content().to_vec())
+                }
+                Err(_) => None,
+            }
+        }
+        None => {
+            let abs = Path::new(&project_path).join(&file_path);
+            match std::fs::read(&abs) {
+                Ok(b) => Some(b),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+                Err(_) => None,
+            }
+        }
+    };
+
+    let Some(bytes) = bytes else {
+        return Ok(FileBytesResult::Missing);
+    };
+
+    let size = bytes.len() as u64;
+    if size > FILE_BYTES_MAX {
+        return Ok(FileBytesResult::TooLarge { size });
+    }
+
+    Ok(FileBytesResult::Ok {
+        data: B64.encode(&bytes),
+        mime: mime_for_extension(&file_path).to_string(),
+    })
+}
+
+/// Resolve the "before" commit hash for an image-diff selection.
+// woke2 impl DIF-RT1
+#[tauri::command]
+pub fn resolve_before_target(
+    project_path: String,
+    older_hash: Option<String>,
+) -> Result<Option<String>, Error> {
+    let repo = Repository::discover(Path::new(&project_path))
+        .map_err(|_| Error::NotAGitRepo(project_path.clone()))?;
+
+    match older_hash {
+        Some(hash) => {
+            let commit = repo
+                .revparse_single(&hash)
+                .map_err(Error::Git)?
+                .peel_to_commit()
+                .map_err(Error::Git)?;
+            match commit.parent(0) {
+                Ok(parent) => Ok(Some(parent.id().to_string())),
+                Err(_) => Ok(None),
+            }
+        }
+        None => match repo.head() {
+            Ok(h) => match h.peel_to_commit() {
+                Ok(c) => Ok(Some(c.id().to_string())),
+                Err(_) => Ok(None),
+            },
+            Err(_) => Ok(None),
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -435,5 +544,100 @@ mod tests {
 
         // Sanity: the root commit (real additions) is unaffected by the flag.
         let _ = root;
+    }
+
+    // woke2 test DIF-FB1
+    #[test]
+    fn get_file_bytes_covers_ok_missing_too_large() {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+
+        // A small PNG-ish file (bytes are arbitrary; the command doesn't sniff).
+        let small_bytes: Vec<u8> = (0..1024u32).map(|i| (i & 0xff) as u8).collect();
+        fs::write(dir.path().join("logo.png"), &small_bytes).unwrap();
+        let head = make_commit(&repo, "add small image");
+        drop(repo);
+
+        let path = dir.path().to_string_lossy().into_owned();
+
+        // From commit: ok with base64 data and mime.
+        match get_file_bytes(path.clone(), "logo.png".into(), Some(head.to_string())).unwrap() {
+            FileBytesResult::Ok { data, mime } => {
+                assert_eq!(mime, "image/png");
+                let decoded = B64.decode(data).unwrap();
+                assert_eq!(decoded, small_bytes);
+            }
+            other => panic!("expected Ok, got {other:?}"),
+        }
+
+        // From workdir: same thing.
+        match get_file_bytes(path.clone(), "logo.png".into(), None).unwrap() {
+            FileBytesResult::Ok { data, .. } => {
+                assert_eq!(B64.decode(data).unwrap(), small_bytes);
+            }
+            other => panic!("expected Ok, got {other:?}"),
+        }
+
+        // Missing file in commit.
+        match get_file_bytes(path.clone(), "nope.png".into(), Some(head.to_string())).unwrap() {
+            FileBytesResult::Missing => {}
+            other => panic!("expected Missing, got {other:?}"),
+        }
+
+        // Missing file in workdir.
+        match get_file_bytes(path.clone(), "nope.png".into(), None).unwrap() {
+            FileBytesResult::Missing => {}
+            other => panic!("expected Missing, got {other:?}"),
+        }
+
+        // Too-large file (workdir): write > 5MB.
+        let big = vec![0u8; (FILE_BYTES_MAX as usize) + 1];
+        fs::write(dir.path().join("big.png"), &big).unwrap();
+        match get_file_bytes(path.clone(), "big.png".into(), None).unwrap() {
+            FileBytesResult::TooLarge { size } => {
+                assert_eq!(size, FILE_BYTES_MAX + 1);
+            }
+            other => panic!("expected TooLarge, got {other:?}"),
+        }
+
+        // Non-repo path errors.
+        let nondir = TempDir::new().unwrap();
+        let err = get_file_bytes(
+            nondir.path().to_string_lossy().into_owned(),
+            "x.png".into(),
+            None,
+        );
+        assert!(matches!(err, Err(Error::NotAGitRepo(_))));
+    }
+
+    // woke2 test DIF-RT1
+    #[test]
+    fn resolve_before_target_returns_parent_or_head() {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        fs::write(dir.path().join("a.txt"), "1\n").unwrap();
+        let root = make_commit(&repo, "root");
+        fs::write(dir.path().join("a.txt"), "2\n").unwrap();
+        let second = make_commit(&repo, "edit");
+        drop(repo);
+
+        let path = dir.path().to_string_lossy().into_owned();
+
+        // older = Some(second) → parent is root.
+        let before = resolve_before_target(path.clone(), Some(second.to_string())).unwrap();
+        assert_eq!(before, Some(root.to_string()));
+
+        // older = Some(root) → root has no parent → None.
+        let before = resolve_before_target(path.clone(), Some(root.to_string())).unwrap();
+        assert_eq!(before, None);
+
+        // older = None → HEAD (second).
+        let before = resolve_before_target(path.clone(), None).unwrap();
+        assert_eq!(before, Some(second.to_string()));
+
+        // Non-repo errors.
+        let nondir = TempDir::new().unwrap();
+        let err = resolve_before_target(nondir.path().to_string_lossy().into_owned(), None);
+        assert!(matches!(err, Err(Error::NotAGitRepo(_))));
     }
 }

@@ -61,6 +61,8 @@ pub fn run() {
             diff::batch_diff_stats,
             diff::get_range_diff,
             diff::get_file_lines,
+            diff::get_file_bytes,
+            diff::resolve_before_target,
             watcher::start_watching,
             watcher::stop_watching,
             comments::create_comment,

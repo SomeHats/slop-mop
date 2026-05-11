@@ -3,11 +3,13 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { CommentComposer } from "@/features/comments/comment-composer"
 import { tokenStyle } from "@/lib/shiki"
-import type { Comment, FileDiff } from "@/lib/types"
+import type { Comment, FileDiff, Selection } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { EXPAND_STEP, type RegionExpansion } from "./compute-diff-rows"
 import { computeDiffLayout } from "./diff-layout"
+import { ImageDiff } from "./image-diff"
 import { InlineCommentCard } from "./inline-comment-card"
+import { isImagePath } from "./is-image"
 import type { HighlightedLineData } from "./use-highlighted-diff"
 import { useHighlightedDiff } from "./use-highlighted-diff"
 
@@ -50,6 +52,10 @@ export type SideBySideDiffProps = {
     | undefined
   /** Imperative ref to scroll a specific line into view from outside (e.g. sidebar click). */
   scrollLineRef?: React.MutableRefObject<((lineNo: number) => void) | null> | undefined
+  /** Project path — used by the image-diff path to fetch bytes. */
+  projectPath: string
+  /** Active selection — used by the image-diff path to resolve before/after refs. */
+  selection: Selection
 }
 
 type PendingRange = { anchor: number; current: number }
@@ -107,7 +113,7 @@ function SideBySideDiffInner({
   onUpdateComment,
   onSubmitComment,
   scrollLineRef,
-}: SideBySideDiffProps): React.JSX.Element {
+}: Omit<SideBySideDiffProps, "projectPath" | "selection">): React.JSX.Element {
   const [expansions, setExpansions] = useState<Map<number, RegionExpansion>>(() => new Map())
   const [pending, setPending] = useState<PendingRange | null>(null)
   /** While we await `resolveAnchor`, hold the range for the visual highlight only. */
@@ -745,4 +751,17 @@ function gutterText(line: HighlightedLineData | null): string {
 // (syntax highlighting, virtualized layout) and gets re-mounted for every file
 // in the diff. Without memo, an unrelated parent re-render — e.g. toggling a
 // comment checkbox — re-runs all of this for every file.
-export const SideBySideDiff = memo(SideBySideDiffInner)
+const SideBySideDiffInnerMemo = memo(SideBySideDiffInner)
+
+export function SideBySideDiff(props: SideBySideDiffProps): React.JSX.Element {
+  // woke2 impl DV-IMG-13
+  // Image diffs short-circuit the entire row + commenting machinery before
+  // any of the text-diff hooks run.
+  if (isImagePath(props.file.path)) {
+    return (
+      <ImageDiff projectPath={props.projectPath} file={props.file} selection={props.selection} />
+    )
+  }
+  const { projectPath: _p, selection: _s, ...rest } = props
+  return <SideBySideDiffInnerMemo {...rest} />
+}

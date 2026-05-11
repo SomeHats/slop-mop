@@ -127,3 +127,8 @@ export type ProjectedComment = {
 export type AnchorForWorkdir =
   | { kind: "anchored"; commit_hash: string; line_start: number; line_end: number | null }
   | { kind: "uncommittable" }
+
+export type FileBytesResult =
+  | { kind: "ok"; data: string; mime: string }
+  | { kind: "missing" }
+  | { kind: "too_large"; size: number }

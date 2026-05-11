@@ -227,10 +227,7 @@ export function collapseRows(
     const isPlainContext =
       row?.kind === "paired" && row.left?.type === "context" && row.right?.type === "context"
     // woke2 impl DV-CL9
-    const isAnchor =
-      isPlainContext &&
-      row.right != null &&
-      mustShowRightLines.has(row.right.lineNo)
+    const isAnchor = isPlainContext && row.right != null && mustShowRightLines.has(row.right.lineNo)
     const isContext = isPlainContext && !isAnchor
 
     if (isContext) {

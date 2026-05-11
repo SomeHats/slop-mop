@@ -338,6 +338,17 @@ Diff viewer rendering and click+drag (compute-diff-rows.ts pure functions are te
 - !DV-CO3 — stable refetch key: needs Tauri IPC mock
 - !DV-CO4 — parallel fetch + silent failure handling: needs Tauri IPC mock
 - !DV-CO5 — synthesised FileDiff shape: covered indirectly via DV-CO4 integration
+- !DV-IMG-2 — dispatch to image-diff component for image files: DOM rendering
+- !DV-IMG-3 — before/after target resolution: needs Tauri IPC mock
+- !DV-IMG-4 — per-side fetch + status labels: needs Tauri IPC mock
+- !DV-IMG-5 — cancellation flag on selection change: needs Tauri IPC mock
+- !DV-IMG-6 — mode React state with 2-up default: DOM rendering
+- !DV-IMG-7 — segmented control in header: DOM rendering
+- !DV-IMG-8 — single-sided forces 2-up: DOM rendering
+- !DV-IMG-10 — 2-up layout: DOM rendering
+- !DV-IMG-11 — fade crossfade + slider: DOM rendering + pointer interaction
+- !DV-IMG-12 — wipe divider + drag: DOM rendering + pointer interaction
+- !DV-IMG-13 — commenting disabled on image diffs: DOM rendering (covered transitively by the dispatch short-circuit in DV-IMG-2)
 
 Project picker / settings UI:
 
