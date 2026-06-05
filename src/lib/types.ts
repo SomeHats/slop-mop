@@ -7,9 +7,13 @@ export type Project = {
 
 export type BranchPrefixMode = "none" | "full" | "feature"
 
+export type PromptFinishedNotification = "none" | "ding" | "nag"
+
 export type ProjectSettings = {
   branchPrefixMode?: BranchPrefixMode
   ignoreWhitespace?: boolean
+  promptFinishedNotification?: PromptFinishedNotification
+  playWhenFocused?: boolean
 }
 
 declare global {

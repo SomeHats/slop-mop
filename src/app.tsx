@@ -10,6 +10,7 @@ import type { ResolvedAnchor } from "./features/diff/side-by-side-diff"
 import { ProjectPicker } from "./features/projects/project-picker"
 import { ProjectSettingsButton } from "./features/projects/project-settings-button"
 import { useProjectSettings } from "./features/projects/use-project-settings"
+import { usePromptFinishedNotification } from "./features/projects/use-prompt-finished-notification"
 import { NewSessionDialog } from "./features/session/new-session-dialog"
 import { TerminalPanel } from "./features/terminal/terminal-panel"
 import { useClaudeSession } from "./hooks/use-claude-session"
@@ -56,6 +57,12 @@ function ProjectApp({
   const session = useClaudeSession(projectPath, projectId)
   const [selection, setSelection] = useState<Selection | null>(null)
   const projectSettings = useProjectSettings(projectId)
+
+  usePromptFinishedNotification({
+    isBusy: session.isBusy,
+    mode: projectSettings.promptFinishedNotification,
+    playWhenFocused: projectSettings.playWhenFocused,
+  })
 
   // woke2 impl APP-SB1
   useEffect(() => {
@@ -235,6 +242,8 @@ function ProjectApp({
             projectPath={projectPath}
             branchPrefixMode={projectSettings.branchPrefixMode}
             ignoreWhitespace={projectSettings.ignoreWhitespace}
+            promptFinishedNotification={projectSettings.promptFinishedNotification}
+            playWhenFocused={projectSettings.playWhenFocused}
             onUpdate={projectSettings.update}
           />
         </div>

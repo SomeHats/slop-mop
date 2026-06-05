@@ -28,6 +28,8 @@ A "project" is a git repo workdir. Worktrees are first-class — opening a workt
 - !PRJ-ST3 `update_project_settings` serializes to JSON and updates the row
 - !PRJ-ST4 The frontend sees `ProjectSettings` with camelCase keys; the Rust struct uses snake_case fields
 - !PRJ-ST5 `ProjectSettings.ignore_whitespace` is a boolean (default `false`) persisted in the same JSON blob; missing-from-JSON deserializes to `false`
+- !PRJ-NT1 `ProjectSettings.prompt_finished_notification` is one of `none` | `ding` | `nag` (default `none`) persisted in the same JSON blob; missing-from-JSON deserializes to `none`
+- !PRJ-NT2 `ProjectSettings.play_when_focused` is a boolean (default `false`) persisted in the same JSON blob; missing-from-JSON deserializes to `false`
 
 ## Branch resolution
 

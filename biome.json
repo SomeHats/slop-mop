@@ -66,10 +66,7 @@
       }
     },
     {
-      "includes": [
-        "src/features/diff/side-by-side-diff.tsx",
-        "src/features/diff/image-diff.tsx"
-      ],
+      "includes": ["src/features/diff/side-by-side-diff.tsx", "src/features/diff/image-diff.tsx"],
       "linter": {
         "rules": {
           "a11y": {

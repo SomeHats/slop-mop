@@ -15,12 +15,23 @@ pub struct Project {
     pub opened_at: String,
 }
 
-// woke2 impl PRJ-ST4, PRJ-ST5
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PromptFinishedNotification {
+    #[default]
+    None,
+    Ding,
+    Nag,
+}
+
+// woke2 impl PRJ-ST4, PRJ-ST5, PRJ-NT1, PRJ-NT2
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProjectSettings {
     pub branch_prefix_mode: BranchPrefixMode,
     pub ignore_whitespace: bool,
+    pub prompt_finished_notification: PromptFinishedNotification,
+    pub play_when_focused: bool,
 }
 
 /// Resolve a path to the working directory of its git repository — main repo

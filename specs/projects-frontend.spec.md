@@ -34,3 +34,12 @@ The frontend for the [project picker](project.spec.md). The picker window appear
 - !PFE-PS2 `update` applies the partial optimistically, then writes through `tauri.updateProjectSettings`; on error reverts both the state and the snapshot
 - !PFE-PS3 `branchPrefixMode` defaults to `none` when the saved settings have no value
 - !PFE-PS4 `ignoreWhitespace` defaults to `false` when the saved settings have no value
+
+## Prompt-finished notifications
+
+- !PFE-NT1 The settings popover has a "Notifications" section below "Diff" with three radio options (`none`, `ding`, `nag`) plus a "Play even when window focused" Switch wired to `playWhenFocused`
+- !PFE-NT2 `useProjectSettings` exposes `promptFinishedNotification` (defaulting to `none`) and `playWhenFocused` (defaulting to `false`) when the saved settings have no value
+- !PFE-NT3 When the agent goes idle, mode is `ding`, and the window is not focused, the ding sound plays exactly once
+- !PFE-NT4 When the agent goes idle, mode is `nag`, and the window is not focused, the ding sound plays immediately and repeats every 5 seconds until the window regains focus
+- !PFE-NT5 When the agent goes idle and the window is focused, notifications are silent unless `playWhenFocused` is `true`, in which case the ding plays exactly once (no loop, even in `nag` mode)
+- !PFE-NT6 An active nag loop stops on focus regain, on the mode changing away from `nag`, and on component unmount

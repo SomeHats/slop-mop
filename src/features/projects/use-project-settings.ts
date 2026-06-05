@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { getProjectSettings, updateProjectSettings } from "@/lib/tauri"
-import type { BranchPrefixMode, ProjectSettings } from "@/lib/types"
+import type { BranchPrefixMode, ProjectSettings, PromptFinishedNotification } from "@/lib/types"
 
 export type UseProjectSettings = {
   settings: ProjectSettings
   branchPrefixMode: BranchPrefixMode
   ignoreWhitespace: boolean
+  promptFinishedNotification: PromptFinishedNotification
+  playWhenFocused: boolean
   /** Update one or more settings. Optimistic; reverts on backend error. */
   update: (partial: Partial<ProjectSettings>) => void
 }
 
-// woke2 impl PFE-PS1, PFE-PS2, PFE-PS3, PFE-PS4
+// woke2 impl PFE-PS1, PFE-PS2, PFE-PS3, PFE-PS4, PFE-NT2
 export function useProjectSettings(projectId: string): UseProjectSettings {
   const [settings, setSettings] = useState<ProjectSettings>({})
   // Snapshot for optimistic-revert.
@@ -50,6 +52,8 @@ export function useProjectSettings(projectId: string): UseProjectSettings {
     settings,
     branchPrefixMode: settings.branchPrefixMode ?? "none",
     ignoreWhitespace: settings.ignoreWhitespace ?? false,
+    promptFinishedNotification: settings.promptFinishedNotification ?? "none",
+    playWhenFocused: settings.playWhenFocused ?? false,
     update,
   }
 }

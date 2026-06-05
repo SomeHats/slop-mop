@@ -148,6 +148,8 @@ Commands that need Tauri state (commits.rs, comments.rs, project.rs, watcher.rs,
 - !PRJ-ST3 — UPDATE statement: needs DB state
 - !PRJ-ST4 — camelCase serde: trivial derive
 - !PRJ-ST5 — ignore_whitespace field default: trivial bool default; round-trip is covered by serde derive shared with PRJ-ST4
+- !PRJ-NT1 — prompt_finished_notification field default: trivial enum default; round-trip shared with PRJ-ST4
+- !PRJ-NT2 — play_when_focused field default: trivial bool default; round-trip shared with PRJ-ST4
 - !PRJ-BR1 — get_head_branch command: needs Tauri context
 - !PRJ-CP1 — current_prefix: needs Tauri state + DB
 - !PRJ-CP2 — None edge cases: needs Tauri state + DB
@@ -371,6 +373,12 @@ Project picker / settings UI:
 - !PFE-PS2 — optimistic update + revert
 - !PFE-PS3 — default mode `none`
 - !PFE-PS4 — default `ignoreWhitespace` `false`: trivial fallback
+- !PFE-NT1 — Notifications popover section: DOM rendering
+- !PFE-NT2 — default `promptFinishedNotification`/`playWhenFocused`: trivial fallback
+- !PFE-NT3 — ding on idle when unfocused: needs HTML5 Audio + Tauri focus runtime
+- !PFE-NT4 — nag loop on idle when unfocused: needs HTML5 Audio + timer + Tauri focus runtime
+- !PFE-NT5 — focused-window gating + playWhenFocused override: needs Tauri focus runtime
+- !PFE-NT6 — nag stop conditions (focus regain / mode change / unmount): needs Tauri focus runtime
 - !SES-DG1 — open binding to `pending !== null`: DOM rendering
 - !SES-DG2 — non-dismissibility: DOM rendering
 - !SES-DG3 — source hint + action handlers: DOM rendering

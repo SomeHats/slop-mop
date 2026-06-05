@@ -13,13 +13,15 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { getHeadBranch } from "@/lib/tauri"
-import type { BranchPrefixMode, ProjectSettings } from "@/lib/types"
+import type { BranchPrefixMode, ProjectSettings, PromptFinishedNotification } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 type Props = {
   projectPath: string
   branchPrefixMode: BranchPrefixMode
   ignoreWhitespace: boolean
+  promptFinishedNotification: PromptFinishedNotification
+  playWhenFocused: boolean
   onUpdate: (partial: Partial<ProjectSettings>) => void
 }
 
@@ -27,6 +29,8 @@ export function ProjectSettingsButton({
   projectPath,
   branchPrefixMode,
   ignoreWhitespace,
+  promptFinishedNotification,
+  playWhenFocused,
   onUpdate,
 }: Props): React.JSX.Element {
   const [branch, setBranch] = useState<string | null>(null)
@@ -52,8 +56,9 @@ export function ProjectSettingsButton({
   }, [open, projectPath])
 
   const ignoreWhitespaceId = useId()
+  const playWhenFocusedId = useId()
 
-  // woke2 impl PFE-ST2, PFE-ST3, PFE-ST5, PFE-ST6, PFE-ST7
+  // woke2 impl PFE-ST2, PFE-ST3, PFE-ST5, PFE-ST6, PFE-ST7, PFE-NT1
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -111,8 +116,76 @@ export function ProjectSettingsButton({
             onCheckedChange={(next) => onUpdate({ ignoreWhitespace: next })}
           />
         </label>
+        <Separator />
+        <PopoverHeader>
+          <PopoverTitle>Notifications</PopoverTitle>
+          <PopoverDescription>
+            Play a sound when the agent finishes the current prompt.
+          </PopoverDescription>
+        </PopoverHeader>
+        <RadioGroup
+          value={promptFinishedNotification}
+          onValueChange={(next) =>
+            onUpdate({ promptFinishedNotification: next as PromptFinishedNotification })
+          }
+          className="gap-1.5"
+        >
+          <NotificationOption
+            value="none"
+            current={promptFinishedNotification}
+            label="None"
+            hint="Silent"
+          />
+          <NotificationOption
+            value="ding"
+            current={promptFinishedNotification}
+            label="Ding"
+            hint="Play once"
+          />
+          <NotificationOption
+            value="nag"
+            current={promptFinishedNotification}
+            label="Nag"
+            hint="Loop until focused"
+          />
+        </RadioGroup>
+        <label
+          htmlFor={playWhenFocusedId}
+          className={cn(
+            "flex cursor-pointer items-center justify-between gap-2.5 px-1.5 py-1.5 text-xs",
+            promptFinishedNotification === "none" && "opacity-60",
+          )}
+        >
+          <span className="font-medium">Play even when focused</span>
+          <Switch
+            id={playWhenFocusedId}
+            checked={playWhenFocused}
+            onCheckedChange={(next) => onUpdate({ playWhenFocused: next })}
+          />
+        </label>
       </PopoverContent>
     </Popover>
+  )
+}
+
+type NotificationOptionProps = {
+  value: PromptFinishedNotification
+  current: PromptFinishedNotification
+  label: string
+  hint: string
+}
+
+function NotificationOption({ value, current, label, hint }: NotificationOptionProps) {
+  const id = `notification-mode-${value}`
+  const selected = current === value
+  return (
+    <label htmlFor={id} className="flex cursor-pointer items-center gap-2.5 px-1.5 py-1.5">
+      <RadioGroupItem id={id} value={value} />
+      <div className="flex flex-1 items-baseline justify-between gap-2 text-xs">
+        <span className={cn("font-medium", selected && "text-foreground")}>{label}</span>
+        <span className="truncate font-mono text-muted-foreground">{hint}</span>
+      </div>
+    </label>
   )
 }
 
